@@ -202,16 +202,10 @@ class TreePrinter : public CoolParserBaseVisitor {
             visitMemDispatch(ctx);
         } else if (ctx->name) {
             visitDispatch(ctx);
-        } else if (ctx->NEW()) {
-            visitNew(ctx);
-        } else if (ctx->COMPL()) {
-            visitCompl(ctx);
-        } else if (ctx->ISVOID()) {
-            visitIsvoid(ctx);
-        } else if (ctx->op) {
+        } else if (ctx->unop) {
+            visitUnop(ctx);
+        } else if (ctx->binop) {
             visitBinop(ctx);
-        } else if (ctx->NOT()) {
-            visitNot(ctx);
         } else if (ctx->ASSIGN()) {
             visitAssign(ctx);
         } else {
@@ -347,32 +341,17 @@ class TreePrinter : public CoolParserBaseVisitor {
         return any{};
     }
 
-    any visitNew(CoolParser::ExprContext *ctx) {
+    any visitUnop(CoolParser::ExprContext *ctx) {
         cout << indent() << '#' << ctx->getStop()->getLine() << endl;
-        cout << indent() << "_new" << endl;
-        indent_level += 2;
-        visitChildren(ctx);
-        indent_level -= 2;
-        cout << indent() << ": _no_type" << endl;
-
-        return any{};
-    }
-
-    any visitCompl(CoolParser::ExprContext *ctx) {
-        cout << indent() << '#' << ctx->getStop()->getLine() << endl;
-        cout << indent() << "_neg" << endl;
-        indent_level += 2;
-        visitChildren(ctx);
-        indent_level -= 2;
-        cout << indent() << ": _no_type" << endl;
-
-        return any{};
-    }
-
-    // any visitIsvoid(CoolParser::IsvoidContext *ctx) override {
-    any visitIsvoid(CoolParser::ExprContext *ctx) {
-        cout << indent() << '#' << ctx->getStop()->getLine() << endl;
-        cout << indent() << "_isvoid" << endl;
+        if (ctx->NEW()) {
+            cout << indent() << "_new" << endl;
+        } else if (ctx->COMPL()) {
+            cout << indent() << "_neg" << endl;
+        } else if (ctx->ISVOID()) {
+            cout << indent() << "_isvoid" << endl;
+        } else if (ctx->NOT()) {
+            cout << indent() << "_comp" << endl;
+        }
         indent_level += 2;
         visitChildren(ctx);
         indent_level -= 2;
@@ -383,42 +362,22 @@ class TreePrinter : public CoolParserBaseVisitor {
 
     any visitBinop(CoolParser::ExprContext *ctx) {
         cout << indent() << '#' << ctx->getStop()->getLine() << endl;
-        switch (ctx->op->getText()[0]) {
-        case '*':
+        if (ctx->TIMES()) {
             cout << indent() << "_mul" << endl;
-            break;
-        case '/':
+        } else if (ctx->DIV()) {
             cout << indent() << "_divide" << endl;
-            break;
-        case '+':
+        } else if (ctx->PLUS()) {
             cout << indent() << "_plus" << endl;
-            break;
-        case '-':
+        } else if (ctx->MINUS()) {
             cout << indent() << "_sub" << endl;
-            break;
-        case '<':
-            if (ctx->op->getText()[1] == '=') {
-                cout << indent() << "_le" << endl;
-            }
-            else {
-                cout << indent() << "_lt" << endl;
-            }
-            break;
-        case '=':
+        } else if (ctx->LE()) {
+            cout << indent() << "_le" << endl;
+        } else if (ctx->LT()) {
+            cout << indent() << "_lt" << endl;
+        } else if (ctx->EQU()) {
             cout << indent() << "_eq" << endl;
-            break;
         }
-        indent_level += 2;
-        visitChildren(ctx);
-        indent_level -= 2;
-        cout << indent() << ": _no_type" << endl;
 
-        return any{};
-    }
-
-    any visitNot(CoolParser::ExprContext *ctx) {
-        cout << indent() << '#' << ctx->getStop()->getLine() << endl;
-        cout << indent() << "_comp" << endl;
         indent_level += 2;
         visitChildren(ctx);
         indent_level -= 2;
@@ -531,28 +490,22 @@ class NoAssocChecker : public CoolParserBaseVisitor {
             inNoAssoc(false), parser_(parser), listener_(listener) {}
 
     any visitExpr(CoolParser::ExprContext *ctx) override {
-        if (ctx->op) {
-            std::string op = ctx->op->getText();
-            if (op[0] == '<' || op[0] == '=') {
-                if (inNoAssoc) {
-                    listener_->syntaxError(NULL, ctx->op, ctx->getStop()->getLine(),
-                                           0, "", NULL);
-                }
-                else {
-                    inNoAssoc = true;
-                    visitExpr(ctx->expr(1));
-                }
+        if (ctx->binop && (ctx->LE() || ctx->LT() || ctx->EQU()) ) {
+            if (inNoAssoc) {
+                listener_->syntaxError(NULL, ctx->binop,
+                                       ctx->getStop()->getLine(),
+                                       0, "", NULL);
             }
             else {
-                inNoAssoc = false;
-                visitExpr(ctx->expr(0));
-                inNoAssoc = false;
+                inNoAssoc = true;
                 visitExpr(ctx->expr(1));
             }
         }
         else {
-            inNoAssoc = false;
-            visitChildren(ctx);
+            for (auto expr : ctx->expr()) {
+                inNoAssoc = false;
+                visitExpr(expr);
+            }
         }
         return any{};
     }

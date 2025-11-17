@@ -6,9 +6,7 @@ program  : (class ';')+ ;
 
 class    : CLASS classname=TYPEID (INHERITS inherit=TYPEID)? '{' (feature';')* '}' ;
 
-feature  : attr
-         | method
-         ;
+feature  : attr | method ;
 
 type     : TYPEID | SELF_TYPE ;
 define   : OBJECTID ':' type;
@@ -24,13 +22,13 @@ expr     : obj=expr ('@' type)? '.' name=OBJECTID '(' (args+=expr (',' args+=exp
          | let
          | block
          | case
-         | NEW type
-         | '~' expr
-         | isvoid=ISVOID expr
-         | expr op=('*' | '/') expr
-         | expr op=('+' | '-') expr
-         | <assoc=right> expr op=('<=' | '<' | '=') expr
-         | NOT expr
+         | unop=NEW type
+         | unop='~' expr
+         | unop=ISVOID expr
+         | expr binop=('*' | '/') expr
+         | expr binop=('+' | '-') expr
+         | <assoc=right> expr binop=('<=' | '<' | '=') expr
+         | unop=NOT expr
          | <assoc=right> OBJECTID '<-' expr
          | paren
          | object
@@ -41,10 +39,9 @@ expr     : obj=expr ('@' type)? '.' name=OBJECTID '(' (args+=expr (',' args+=exp
 
 if       : IF expr THEN expr ELSE expr FI ;
 while    : WHILE expr LOOP expr POOL ;
+block    : '{' (expr ';')+ '}' ;
 letdef   : define ('<-' expr)? ;
 let      : LET letdef (',' letdef)* IN expr ;
-// TODO: where block
-block    : '{' (expr ';')+ '}' ;
 branch   : define '=>' expr ';' ;
 case     : CASE expr OF branch+ ESAC ;
 paren    : '(' expr ')' ;
