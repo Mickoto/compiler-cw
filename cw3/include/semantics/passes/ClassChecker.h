@@ -2,6 +2,7 @@
 #define SEMANTICS_PASSES_CLASS_CHECKER_H_
 
 #include <any>
+#include <expected>
 #include <string>
 #include <map>
 #include <vector>
@@ -9,9 +10,11 @@
 #include "CoolParser.h"
 #include "CoolParserBaseVisitor.h"
 
+typedef int Type;
+
 struct ClassInfo {
     std::string name;
-    std::string super;
+    Type super;
 };
 
 class TypeTree {
@@ -21,30 +24,40 @@ private:
     std::vector<ClassInfo> classes;
 
 public:
+    static const Type root_type = -1;
+
     bool contains(const std::string& classname) const;
-    void insert(const std::string& classname, ClassInfo info);
-    std::vector<ClassInfo> get_classes() const;
-    ClassInfo getParent(const std::string& name) const;
+    Type add_class(const std::string& classname);
+    void set_super(Type base, Type super);
+    Type insert(const std::string& classname, Type super);
+
+    std::vector<Type> get_classes() const;
+    Type from_name(const std::string& classname) const;
+    ClassInfo& getInfo(Type t);
+    Type getParent(Type t) const;
+    bool isSuper(Type t, Type sup);
+    Type lub(Type t1, Type t2);
 };
 
 class TypeTreeBuilder : public CoolParserBaseVisitor {
 private:
     std::vector<std::string> errors;
-    std::string current_class;
+
     TypeTree type_tree;
+    Type current_class;
+    std::vector<std::pair<Type, std::string>> supers;
 
 public:
     TypeTreeBuilder() {}
 
     virtual std::any visitClass(CoolParser::ClassContext *ctx) override;
-    virtual std::any visitMethod(CoolParser::MethodContext *ctx) override;
+    // virtual std::any visitMethod(CoolParser::MethodContext *ctx) override;
+    // virtual std::any visitAttr(CoolParser::AttrContext *ctx) override;
 
-    // Checks hierarchy tree and method overwriting
-    TypeTree build(CoolParser *parser);
+    std::expected<TypeTree, std::vector<std::string>> build(CoolParser *parser);
 };
 
-std::vector<std::string> checkUndefined(TypeTree &tree);
-std::vector<std::string> checkCycles(TypeTree &tree);
+std::vector<std::string> checkLoops(TypeTree &tree);
 std::vector<std::string> checkOverwrites(TypeTree &tree);
 
 #endif //SEMANTICS_PASSES_CLASS_CHECKER_H_

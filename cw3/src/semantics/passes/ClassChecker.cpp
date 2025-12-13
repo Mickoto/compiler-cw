@@ -1,67 +1,157 @@
 #include "semantics/passes/ClassChecker.h"
-#include <iterator>
+
+using std::vector;
 
 bool TypeTree::contains(const std::string& classname) const {
-    return name_to_idx.count(classname);
+    return classname == "Object" || name_to_idx.count(classname);
 }
 
-void TypeTree::insert(const std::string& classname, ClassInfo info) {
-    name_to_idx[classname] = classes.size();
+Type TypeTree::add_class(const std::string& classname) {
+    name_to_idx.insert({classname, classes.size()});
+    ClassInfo info;
+    info.name = classname;
     classes.push_back(info);
+
+    return classes.size() - 1;
 }
 
-std::vector<ClassInfo> TypeTree::get_classes() const { return classes; }
-
-ClassInfo TypeTree::getParent(const std::string& name) const { 
-    int idx = name_to_idx.at(name);
-    int paridx = name_to_idx.at(classes[idx].super);
-    return classes[paridx];
+void TypeTree::set_super(Type base, Type super) {
+    classes[base].super = super;
 }
 
-TypeTree TypeTreeBuilder::build(CoolParser *parser) {
+Type TypeTree::insert(const std::string& classname, Type super) {
+    Type ret = add_class(classname);
+    set_super(ret, super);
+    return ret;
+}
+
+vector<Type> TypeTree::get_classes() const { 
+    // NOTE: Extremely scuffed
+    std::vector<Type> ret;
+    for (int i = 0; i < classes.size(); i++) {
+        ret.push_back(i);
+    }
+    return ret;
+}
+
+Type TypeTree::from_name(const std::string& classname) const {
+    if (classname == "Object") return root_type;
+    return name_to_idx.at(classname);
+}
+
+ClassInfo& TypeTree::getInfo(Type t) {
+    return classes[t];
+}
+
+Type TypeTree::getParent(Type t) const {
+    return classes[t].super;
+}
+
+bool TypeTree::isSuper(Type t, Type sup) {
+    while (t != root_type) {
+        if (t == sup) return true;
+        t = getParent(t);
+    }
+    return t == sup;
+}
+
+Type TypeTree::lub(Type t1, Type t2) {
+    std::unordered_set<Type> visited;
+    while(t1 != root_type) {
+        visited.insert(t1);
+        t1 = getParent(t1);
+    }
+    while(t2 != root_type) {
+        if (visited.count(t2)) break;
+        t2 = getParent(t2);
+    }
+    return t2;
+}
+
+std::expected<TypeTree, vector<std::string> > TypeTreeBuilder::build(CoolParser *parser) {
     type_tree = TypeTree();
-    type_tree.insert("Int", {"Object"});
-    type_tree.insert("Bool", {"Object"});
-    type_tree.insert("String", {"Object"});
-    type_tree.insert("IO", {"Object"});
+    type_tree.insert("Int", type_tree.root_type);
+    type_tree.insert("Bool", type_tree.root_type);
+    type_tree.insert("String", type_tree.root_type);
+    type_tree.insert("IO", type_tree.root_type);
     visitProgram(parser->program());
 
-    return std::move(type_tree);
+    for (auto pair : supers) {
+        if (!type_tree.contains(pair.second)) {
+            errors.push_back(type_tree.getInfo(pair.first).name + " inherits from undefined class " + pair.second);
+        }
+        else {
+            type_tree.set_super(pair.first, type_tree.from_name(pair.second));
+        }
+    }
+
+    if (errors.empty())
+        return std::move(type_tree);
+    else
+        return std::unexpected(errors);
 }
 
 std::any TypeTreeBuilder::visitClass(CoolParser::ClassContext *ctx) {
-    if (type_tree.contains(ctx->classname->getText())) {
-        errors.push_back("No");
+    std::string name = ctx->classname->getText();
+    if (type_tree.contains(name)) {
+        errors.push_back(name + " redefined!");
     }
-    type_tree.insert(ctx->classname->getText(), {ctx->inherit->getText()});
+
+    Type t = type_tree.add_class(name);
+    if (ctx->inherit)
+        supers.push_back({t, ctx->inherit->getText()});
+    else
+        type_tree.set_super(t, type_tree.root_type);
 
     return std::any {};
 }
 
-std::vector<std::string> checkUndefined(TypeTree &tree) {
-    std::vector<std::string> errors;
-    for (auto c : tree.get_classes()) {
-        if (!tree.contains(c.name)) {
-            // TODO: add an error
+std::string print_inheritance_loops_error(vector<vector<std::string>> inheritance_loops) {
+    std::stringstream eout;
+    eout << "Detected " << inheritance_loops.size()
+         << " loops in the type hierarchy:" << std::endl;
+    for (int i = 0; i < inheritance_loops.size(); ++i) {
+        eout << i + 1 << ") ";
+        auto &loop = inheritance_loops[i];
+        for (std::string name : loop) {
+            eout << name << " <- ";
         }
+        eout << std::endl;
     }
-    return errors;
+
+    return eout.str();
 }
 
-std::vector<std::string> checkCycles(TypeTree &tree) {
-    std::vector<std::string> errors;
-    for (auto c : tree.get_classes()) {
-        auto curr = tree.getParent(c.name);
-        std::unordered_set<std::string> visited;
-        visited.insert(c.name);
-        while (curr.name != "Object") {
-            if (visited.count(curr.name)) {
-                // TODO: cycle detected!
+vector<std::string> checkLoops(TypeTree &tree) {
+    vector<std::string> errors;
+
+    std::unordered_set<Type> cycle_classes;
+    vector<vector<std::string>> cycles;
+    for (Type t : tree.get_classes()) {
+        if (cycle_classes.count(t)) continue;
+        Type curr = tree.getParent(t);
+        std::unordered_set<Type> visited;
+        visited.insert(t);
+        while (curr != tree.root_type) {
+            if (visited.count(curr)) {
+                Type end = curr;
+                vector<std::string> cycle;
+                do {
+                    cycle.push_back(tree.getInfo(curr).name);
+                    cycle_classes.insert(curr);
+                    curr = tree.getParent(curr);
+                }
+                while (curr != end);
+                cycles.push_back(cycle);
+                break;
             }
-            visited.insert(curr.name);
-            curr = tree.getParent(curr.name);
+            visited.insert(curr);
+            curr = tree.getParent(curr);
         }
+    }
+
+    if (!cycles.empty()) {
+        errors.push_back(print_inheritance_loops_error(cycles));
     }
     return errors;
 }
-std::vector<std::string> checkOverwrites(TypeTree &tree);
