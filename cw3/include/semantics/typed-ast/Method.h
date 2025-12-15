@@ -13,15 +13,15 @@ class Method {
     std::string name_;
     // The first n-1 elements of signature_ are the argument types and the last
     // element of signature_ is the return type.
-    std::vector<int> signature_;
+    std::vector<Type> signature_;
     std::vector<std::string> argument_names_;
     std::unique_ptr<Expr> body_;
 
   public:
-    Method(std::string name, std::vector<int> signature)
+    Method(std::string name, std::vector<Type> signature)
         : name_(std::move(name)), signature_(std::move(signature)) {}
 
-    const std::vector<int> &get_signature() const { return signature_; }
+    const std::vector<Type> &get_signature() const { return signature_; }
 
     const std::string &get_name() const { return name_; }
 

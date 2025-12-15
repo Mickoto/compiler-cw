@@ -2,106 +2,41 @@
 
 using std::vector;
 
-bool TypeTree::contains(const std::string& classname) const {
-    return classname == "Object" || name_to_idx.count(classname);
-}
-
-Type TypeTree::add_class(const std::string& classname) {
-    name_to_idx.insert({classname, classes.size()});
-    ClassInfo info;
-    info.name = classname;
-    classes.push_back(info);
-
-    return classes.size() - 1;
-}
-
-void TypeTree::set_super(Type base, Type super) {
-    classes[base].super = super;
-}
-
-Type TypeTree::insert(const std::string& classname, Type super) {
-    Type ret = add_class(classname);
-    set_super(ret, super);
-    return ret;
-}
-
-vector<Type> TypeTree::get_classes() const { 
-    // NOTE: Extremely scuffed
-    std::vector<Type> ret;
-    for (int i = 0; i < classes.size(); i++) {
-        ret.push_back(i);
-    }
-    return ret;
-}
-
-Type TypeTree::from_name(const std::string& classname) const {
-    if (classname == "Object") return root_type;
-    return name_to_idx.at(classname);
-}
-
-ClassInfo& TypeTree::getInfo(Type t) {
-    return classes[t];
-}
-
-Type TypeTree::getParent(Type t) const {
-    return classes[t].super;
-}
-
-bool TypeTree::isSuper(Type t, Type sup) {
-    while (t != root_type) {
-        if (t == sup) return true;
-        t = getParent(t);
-    }
-    return t == sup;
-}
-
-Type TypeTree::lub(Type t1, Type t2) {
-    std::unordered_set<Type> visited;
-    while(t1 != root_type) {
-        visited.insert(t1);
-        t1 = getParent(t1);
-    }
-    while(t2 != root_type) {
-        if (visited.count(t2)) break;
-        t2 = getParent(t2);
-    }
-    return t2;
-}
-
-std::expected<TypeTree, vector<std::string> > TypeTreeBuilder::build(CoolParser *parser) {
-    type_tree = TypeTree();
-    type_tree.insert("Int", type_tree.root_type);
-    type_tree.insert("Bool", type_tree.root_type);
-    type_tree.insert("String", type_tree.root_type);
-    type_tree.insert("IO", type_tree.root_type);
+std::expected<Classes, vector<std::string> > ClassesBuilder::build(CoolParser *parser) {
+    ast = Classes();
+    obj = ast.insert("Object", ast.no_type);
+    ast.insert("Int", obj);
+    ast.insert("Bool", obj);
+    ast.insert("String", obj);
+    ast.insert("IO", obj);
     visitProgram(parser->program());
 
     for (auto pair : supers) {
-        if (!type_tree.contains(pair.second)) {
-            errors.push_back(type_tree.getInfo(pair.first).name + " inherits from undefined class " + pair.second);
+        if (!ast.contains(pair.second)) {
+            errors.push_back(ast.get_class(pair.first)->get_name() + " inherits from undefined class " + pair.second);
         }
         else {
-            type_tree.set_super(pair.first, type_tree.from_name(pair.second));
+            ast.get_class(pair.first)->set_parent(ast.from_name(pair.second));
         }
     }
 
     if (errors.empty())
-        return std::move(type_tree);
+        return std::move(ast);
     else
         return std::unexpected(errors);
 }
 
-std::any TypeTreeBuilder::visitClass(CoolParser::ClassContext *ctx) {
+std::any ClassesBuilder::visitClass(CoolParser::ClassContext *ctx) {
     std::string name = ctx->classname->getText();
-    if (type_tree.contains(name)) {
+    if (ast.contains(name)) {
         errors.push_back(name + " redefined!");
     }
 
-    Type t = type_tree.add_class(name);
+    Type t = ast.add(name);
     if (ctx->inherit)
         supers.push_back({t, ctx->inherit->getText()});
     else
-        type_tree.set_super(t, type_tree.root_type);
+        ast.get_class(t)->set_parent(obj);
 
     return std::any {};
 }
@@ -122,31 +57,31 @@ std::string print_inheritance_loops_error(vector<vector<std::string>> inheritanc
     return eout.str();
 }
 
-vector<std::string> checkLoops(TypeTree &tree) {
+vector<std::string> checkLoops(Classes &tree) {
     vector<std::string> errors;
 
     std::unordered_set<Type> cycle_classes;
     vector<vector<std::string>> cycles;
     for (Type t : tree.get_classes()) {
         if (cycle_classes.count(t)) continue;
-        Type curr = tree.getParent(t);
+        Type curr = tree.get_parent(t);
         std::unordered_set<Type> visited;
         visited.insert(t);
-        while (curr != tree.root_type) {
+        while (curr != tree.no_type) {
             if (visited.count(curr)) {
                 Type end = curr;
                 vector<std::string> cycle;
                 do {
-                    cycle.push_back(tree.getInfo(curr).name);
+                    cycle.push_back(tree.get_class(curr)->get_name());
                     cycle_classes.insert(curr);
-                    curr = tree.getParent(curr);
+                    curr = tree.get_parent(curr);
                 }
                 while (curr != end);
                 cycles.push_back(cycle);
                 break;
             }
             visited.insert(curr);
-            curr = tree.getParent(curr);
+            curr = tree.get_parent(curr);
         }
     }
 

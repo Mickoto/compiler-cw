@@ -18,7 +18,7 @@ class Attribute {
     Attribute(std::string name, int type)
         : name_(std::move(name)), type_(std::move(type)) {}
 
-    const int &get_type() const { return type_; }
+    const Type &get_type() const { return type_; }
 
     const std::string &get_name() const { return name_; }
 

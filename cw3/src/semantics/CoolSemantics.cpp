@@ -15,13 +15,13 @@ using namespace std;
 expected<void *, vector<string>> CoolSemantics::run() {
     vector<string> errors;
 
-    TypeTreeBuilder tt_builder;
+    ClassesBuilder tt_builder;
     auto ret = tt_builder.build(parser_);
     if (!ret.has_value()) {
         return unexpected(ret.error());
     }
 
-    TypeTree tree = ret.value();
+    Classes ast = ret.value();
 
     // check for undefined classes
     if (!errors.empty()) {
@@ -29,7 +29,7 @@ expected<void *, vector<string>> CoolSemantics::run() {
     }
 
     // check inheritance loops
-    for (const auto &error : checkLoops(tree)) {
+    for (const auto &error : checkLoops(ast)) {
         errors.push_back(error);
     }
 

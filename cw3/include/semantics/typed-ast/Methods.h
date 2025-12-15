@@ -17,8 +17,8 @@ class Methods {
     std::unordered_map<std::string, int> method_name_to_index_;
 
   public:
-    std::optional<std::vector<int>>
-    get_signature(const std::string &method_name);
+    std::optional<std::vector<Type>>
+        get_signature(const std::string &method_name);
 
     void add_method(Method &&method);
 
