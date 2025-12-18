@@ -4,18 +4,17 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "Expr.h"
 
 class Attribute {
   private:
     std::string name_;
-    int type_;
+    Type type_;
     std::unique_ptr<Expr> initializer_;
 
   public:
-    Attribute(std::string name, int type)
+    Attribute(std::string name, Type type)
         : name_(std::move(name)), type_(std::move(type)) {}
 
     const Type &get_type() const { return type_; }

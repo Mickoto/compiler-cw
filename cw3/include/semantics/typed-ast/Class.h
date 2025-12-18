@@ -3,7 +3,6 @@
 #include "Attributes.h"
 #include "Methods.h"
 
-#include <memory>
 #include <string>
 
 class Class {
@@ -11,10 +10,12 @@ private:
     std::string name_;
     Type parent;
     Attributes attributes;
-    // Methods methods;
+    Methods methods;
 
 public:
     Class(std::string name) : name_(name) {}
+    Class(const Class &) = delete;
+    Class(Class &&) = default;
 
     const Type &get_parent() const { return parent; }
     const std::string &get_name() const { return name_; }
@@ -24,7 +25,7 @@ public:
     }
 
     Attributes *get_attributes() { return &attributes; }
-    // Methods *get_methods() { return &methods; }
+    Methods *get_methods() { return &methods; }
 };
 
 #endif

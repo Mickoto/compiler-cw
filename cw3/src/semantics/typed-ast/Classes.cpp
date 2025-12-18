@@ -10,8 +10,7 @@ bool Classes::contains(const std::string& classname) const {
 
 Type Classes::add(const std::string& classname) {
     name_to_idx.insert({classname, classes.size()});
-    Class c(classname);
-    classes.push_back(c);
+    classes.push_back(classname);
 
     return classes.size() - 1;
 }

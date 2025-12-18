@@ -1,4 +1,4 @@
-#include "semantics/passes/ClassChecker.h"
+#include "semantics/passes/ClassTreeChecker.h"
 
 using std::vector;
 

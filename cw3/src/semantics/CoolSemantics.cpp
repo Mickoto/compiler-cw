@@ -4,7 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "passes/ClassChecker.h"
+#include "passes/ClassTreeChecker.h"
+#include "passes/MethodChecker.h"
 #include "passes/TypeChecker.h"
 
 using namespace std;
@@ -12,7 +13,7 @@ using namespace std;
 // Runs semantic analysis and returns a list of errors, if any.
 //
 // TODO: change the type from void * to your typed AST type
-expected<void *, vector<string>> CoolSemantics::run() {
+expected<Classes, vector<string>> CoolSemantics::run() {
     vector<string> errors;
 
     ClassesBuilder tt_builder;
@@ -21,7 +22,7 @@ expected<void *, vector<string>> CoolSemantics::run() {
         return unexpected(ret.error());
     }
 
-    Classes ast = ret.value();
+    Classes ast = std::move(ret.value());
 
     // check for undefined classes
     if (!errors.empty()) {
@@ -33,14 +34,30 @@ expected<void *, vector<string>> CoolSemantics::run() {
         errors.push_back(error);
     }
 
+    // if (!errors.empty()) {
+    //     return unexpected(errors);
+    // }
+
+    // collect features
+    parser_->reset();
+    for (const auto &error : MethodCollector().collect_methods(parser_, &ast)) {
+        errors.push_back(error);
+    }
+
+    // if (!errors.empty()) {
+    //     return unexpected(errors);
+    // }
+
+    // check overwrite correctness
+    for (const auto &error : checkOverwrites(ast)) {
+        errors.push_back(error);
+    }
+
     if (!errors.empty()) {
         return unexpected(errors);
     }
 
-    // collect features
-
-    // check methods are overridden correctly
-
+    // typecheck
     parser_->reset();
     for (const auto &error : TypeChecker().check(parser_)) {
         errors.push_back(error);
@@ -51,5 +68,5 @@ expected<void *, vector<string>> CoolSemantics::run() {
     }
 
     // return the typed AST
-    return nullptr;
+    return std::move(ast);
 }

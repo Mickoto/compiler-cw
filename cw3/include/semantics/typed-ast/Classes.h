@@ -14,6 +14,12 @@ private:
     std::vector<Class> classes;
 
 public:
+    Classes() = default;
+    Classes(const Classes &) = delete;
+    Classes(Classes &&) = default;
+    Classes& operator=(const Classes &) = delete;
+    Classes& operator=(Classes &&) = default;
+
     static const Type no_type = -1;
 
     bool contains(const std::string& classname) const;

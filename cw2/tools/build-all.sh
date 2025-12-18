@@ -1,2 +1,2 @@
 ../cw1/tools/build.sh
-tools/build.sh
+../cw2/tools/build.sh
