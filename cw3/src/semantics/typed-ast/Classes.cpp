@@ -1,6 +1,7 @@
 #include "Classes.h"
 
 #include <unordered_set>
+#include <cassert>
 
 using std::vector;
 
@@ -38,10 +39,12 @@ Class *Classes::get_class(Type t) {
 }
 
 Type Classes::get_parent(Type t) const {
+    assert(t >= 0);
     return classes[t].get_parent();
 }
 
 bool Classes::is_super(Type t, Type sup) {
+    if (t == error_type) return true;
     while (t != no_type) {
         if (t == sup) return true;
         t = get_parent(t);
@@ -50,6 +53,8 @@ bool Classes::is_super(Type t, Type sup) {
 }
 
 Type Classes::lub(Type t1, Type t2) {
+    if (t1 == error_type) return t2;
+    if (t2 == error_type) return t1;
     std::unordered_set<Type> visited;
     while(t1 != no_type) {
         visited.insert(t1);

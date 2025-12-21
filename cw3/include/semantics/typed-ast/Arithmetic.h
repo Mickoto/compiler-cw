@@ -22,7 +22,7 @@ class Arithmetic : public Expr {
 
   public:
     Arithmetic(std::unique_ptr<Expr> lhs, std::unique_ptr<Expr> rhs, Kind kind,
-               int type)
+               Type type)
         : Expr(type), lhs_(std::move(lhs)), rhs_(std::move(rhs)), kind_(kind) {}
 
     Expr *get_lhs() const { return lhs_.get(); }

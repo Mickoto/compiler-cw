@@ -11,7 +11,7 @@ class StringConstant : public Expr {
     std::string value_;
 
   public:
-    StringConstant(std::string value, int type)
+    StringConstant(std::string value, Type type)
         : Expr(type), value_(std::move(value)) {}
 
     const std::string &get_value() const { return value_; }

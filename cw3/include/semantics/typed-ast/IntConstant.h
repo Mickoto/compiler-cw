@@ -8,7 +8,7 @@ class IntConstant : public Expr {
     int value_;
 
   public:
-    IntConstant(int value, int type) : Expr(type), value_(value) {}
+    IntConstant(int value, Type type) : Expr(type), value_(value) {}
 
     int get_value() const { return value_; }
 };

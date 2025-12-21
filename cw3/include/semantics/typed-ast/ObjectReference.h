@@ -11,7 +11,7 @@ class ObjectReference : public Expr {
     std::string name_;
 
   public:
-    ObjectReference(std::string name, int type)
+    ObjectReference(std::string name, Type type)
         : Expr(type), name_(std::move(name)) {}
 
     const std::string &get_name() const { return name_; }

@@ -16,7 +16,7 @@ class StaticDispatch : public Expr {
     std::vector<std::unique_ptr<Expr>> arguments_;
 
   public:
-    StaticDispatch(std::unique_ptr<Expr> target, int static_dispatch_type,
+    StaticDispatch(std::unique_ptr<Expr> target, Type static_dispatch_type,
                    std::string method_name,
                    std::vector<std::unique_ptr<Expr>> arguments, int type)
         : Expr(type), target_(std::move(target)),

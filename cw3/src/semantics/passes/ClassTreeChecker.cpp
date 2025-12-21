@@ -10,10 +10,23 @@ std::expected<Classes, vector<std::string> > ClassesBuilder::build(CoolParser *p
     ast.insert("String", obj);
     ast.insert("IO", obj);
     visitProgram(parser->program());
+    std::unordered_set uninheritable(
+        {
+            ast.from_name("Bool"),
+            ast.from_name("Int"),
+            ast.from_name("String")
+        }
+    );
 
     for (auto pair : supers) {
         if (!ast.contains(pair.second)) {
             errors.push_back(ast.get_class(pair.first)->get_name() + " inherits from undefined class " + pair.second);
+        }
+        else if (uninheritable.count(ast.from_name(pair.second))) {
+            std::stringstream ss;
+            ss << "`" << ast.get_class(pair.first)->get_name() <<
+                "` inherits from `" << pair.second << "` which is an error";
+            errors.push_back(ss.str());
         }
         else {
             ast.get_class(pair.first)->set_parent(ast.from_name(pair.second));
@@ -29,7 +42,10 @@ std::expected<Classes, vector<std::string> > ClassesBuilder::build(CoolParser *p
 std::any ClassesBuilder::visitClass(CoolParser::ClassContext *ctx) {
     std::string name = ctx->classname->getText();
     if (ast.contains(name)) {
-        errors.push_back(name + " redefined!");
+        std::stringstream ss;
+        ss << "Type `" << name << "` already defined";
+        errors.push_back(ss.str());
+        return std::any {};
     }
 
     Type t = ast.add(name);

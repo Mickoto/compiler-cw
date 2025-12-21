@@ -11,7 +11,7 @@ class IntegerNegation : public Expr {
     std::unique_ptr<Expr> argument_;
 
   public:
-    IntegerNegation(std::unique_ptr<Expr> argument, int type)
+    IntegerNegation(std::unique_ptr<Expr> argument, Type type)
         : Expr(type), argument_(std::move(argument)) {}
 
     Expr *get_argument() const { return argument_.get(); }

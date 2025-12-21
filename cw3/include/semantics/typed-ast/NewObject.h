@@ -5,7 +5,7 @@
 
 class NewObject : public Expr {
   public:
-    NewObject(int type) : Expr(type) {}
+    NewObject(Type type) : Expr(type) {}
 };
 
 #endif

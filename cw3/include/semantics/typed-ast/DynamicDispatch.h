@@ -16,7 +16,7 @@ class DynamicDispatch : public Expr {
 
   public:
     DynamicDispatch(std::unique_ptr<Expr> target, std::string method_name,
-                    std::vector<std::unique_ptr<Expr>> arguments, int type)
+                    std::vector<std::unique_ptr<Expr>> arguments, Type type)
         : Expr(type), target_(std::move(target)),
           method_name_(std::move(method_name)),
           arguments_(std::move(arguments)) {}

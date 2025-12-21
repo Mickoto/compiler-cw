@@ -8,7 +8,7 @@ class BoolConstant : public Expr {
     bool value_;
 
   public:
-    BoolConstant(bool value, int type) : Expr(type), value_(value) {}
+    BoolConstant(bool value, Type type) : Expr(type), value_(value) {}
 
     bool get_value() const { return value_; }
 };

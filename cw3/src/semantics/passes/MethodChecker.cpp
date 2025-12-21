@@ -13,10 +13,12 @@ std::any MethodCollector::visitMethod(CoolParser::MethodContext *ctx) {
     std::string classname_ = ast->get_class(current)->get_name();
     std::string methodname = ctx->name->getText();
     std::vector<Type> signature;
+    std::vector<std::string> argnames;
     for (auto f : ctx->formal()) {
         auto *type = f->define()->type();
         if (type->SELF_TYPE()) {
             signature.push_back(current);
+            argnames.push_back(f->define()->OBJECTID()->getText());
         }
         else {
             std::string typename_ = type->TYPEID()->getText();
@@ -29,6 +31,7 @@ std::any MethodCollector::visitMethod(CoolParser::MethodContext *ctx) {
                 return std::any {};
             }
             signature.push_back(ast->from_name(typename_));
+            argnames.push_back(f->define()->OBJECTID()->getText());
         }
     }
 
@@ -57,7 +60,7 @@ std::any MethodCollector::visitMethod(CoolParser::MethodContext *ctx) {
         return std::any {};
     }
     methods->add_method(Method(methodname, signature));
-    // TODO: body
+    methods->set_argument_names(methodname, argnames);
 
     return std::any {};
 }
@@ -92,7 +95,6 @@ std::any MethodCollector::visitAttr(CoolParser::AttrContext *ctx) {
         return std::any {};
     }
     attrs->add(Attribute(attrname, attrtype));
-    // TODO: initializer
 
     return std::any {};
 }

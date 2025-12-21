@@ -13,15 +13,15 @@ class CaseOfEsac : public Expr {
     class Case {
       private:
         std::string name_;
-        int type_;
+        Type type_;
         std::unique_ptr<Expr> expr_;
 
       public:
-        Case(std::string name, int type, std::unique_ptr<Expr> expr)
+        Case(std::string name, Type type, std::unique_ptr<Expr> expr)
             : name_(std::move(name)), type_(type), expr_(std::move(expr)) {}
 
         const std::string &get_name() const { return name_; }
-        int get_type() const { return type_; }
+        Type get_type() const { return type_; }
         const Expr *get_expr() const { return expr_.get(); }
     };
 
@@ -32,7 +32,7 @@ class CaseOfEsac : public Expr {
 
   public:
     CaseOfEsac(std::unique_ptr<Expr> multiplex, std::vector<Case> &&cases,
-               int line, int type)
+               int line, Type type)
         : Expr(type), multiplex_(std::move(multiplex)),
           cases_(std::move(cases)), line_(line) {}
 

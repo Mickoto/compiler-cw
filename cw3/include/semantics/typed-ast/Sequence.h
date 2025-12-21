@@ -12,7 +12,7 @@ class Sequence : public Expr {
     std::vector<std::unique_ptr<Expr>> sequence_;
 
   public:
-    Sequence(std::vector<std::unique_ptr<Expr>> sequence, int type)
+    Sequence(std::vector<std::unique_ptr<Expr>> sequence, Type type)
         : Expr(type), sequence_(std::move(sequence)) {}
 
     std::vector<Expr *> get_sequence() const {

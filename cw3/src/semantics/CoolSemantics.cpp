@@ -59,7 +59,7 @@ expected<Classes, vector<string>> CoolSemantics::run() {
 
     // typecheck
     parser_->reset();
-    for (const auto &error : TypeChecker().check(parser_)) {
+    for (const auto &error : TypeChecker().check(lexer_, parser_, &ast)) {
         errors.push_back(error);
     }
 

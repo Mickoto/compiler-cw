@@ -13,7 +13,7 @@ class WhileLoopPool : public Expr {
 
   public:
     WhileLoopPool(std::unique_ptr<Expr> condition, std::unique_ptr<Expr> body,
-                  int type)
+                  Type type)
         : Expr(type), condition_(std::move(condition)), body_(std::move(body)) {
     }
 

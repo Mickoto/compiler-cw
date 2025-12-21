@@ -13,7 +13,7 @@ class EqualityComparison : public Expr {
 
   public:
     EqualityComparison(std::unique_ptr<Expr> lhs, std::unique_ptr<Expr> rhs,
-                       int type)
+                       Type type)
         : Expr(type), lhs_(std::move(lhs)), rhs_(std::move(rhs)) {}
 
     const Expr *get_lhs() const { return lhs_.get(); }

@@ -13,10 +13,10 @@ class Vardecl : public Expr {
     std::unique_ptr<Expr> initializer_;
 
   public:
-    Vardecl(std::string name, int type)
+    Vardecl(std::string name, Type type)
         : Expr(type), name_(std::move(name)), initializer_(nullptr) {}
 
-    Vardecl(std::string name, std::unique_ptr<Expr> initializer, int type)
+    Vardecl(std::string name, std::unique_ptr<Expr> initializer, Type type)
         : Expr(type), name_(std::move(name)),
           initializer_(std::move(initializer)) {}
 

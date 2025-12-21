@@ -15,7 +15,7 @@ class IfThenElseFi : public Expr {
   public:
     IfThenElseFi(std::unique_ptr<Expr> condition,
                  std::unique_ptr<Expr> then_expr,
-                 std::unique_ptr<Expr> else_expr, int type)
+                 std::unique_ptr<Expr> else_expr, Type type)
         : Expr(type), condition_(std::move(condition)),
           then_expr_(std::move(then_expr)), else_expr_(std::move(else_expr)) {}
 

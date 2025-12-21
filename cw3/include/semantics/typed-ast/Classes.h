@@ -21,6 +21,7 @@ public:
     Classes& operator=(Classes &&) = default;
 
     static const Type no_type = -1;
+    static const Type error_type = -2;
 
     bool contains(const std::string& classname) const;
     Type add(const std::string& classname);

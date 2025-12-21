@@ -11,7 +11,7 @@ class IsVoid : public Expr {
     std::unique_ptr<Expr> check_subject_;
 
   public:
-    IsVoid(std::unique_ptr<Expr> check_subject, int type)
+    IsVoid(std::unique_ptr<Expr> check_subject, Type type)
         : Expr(type), check_subject_(std::move(check_subject)) {}
 
     const Expr *get_subject() const { return check_subject_.get(); }

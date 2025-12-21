@@ -12,7 +12,7 @@ class Assignment : public Expr {
     std::unique_ptr<Expr> value_;
 
   public:
-    Assignment(std::string assignee_name, std::unique_ptr<Expr> value, int type)
+    Assignment(std::string assignee_name, std::unique_ptr<Expr> value, Type type)
         : Expr(type), assignee_name_(assignee_name), value_(std::move(value)) {}
 
     const std::string &get_assignee_name() const { return assignee_name_; }
