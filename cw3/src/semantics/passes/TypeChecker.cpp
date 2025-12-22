@@ -1,6 +1,7 @@
 #include "TypeChecker.h"
 
 #include <any>
+#include <cinttypes>
 #include <cstdlib>
 #include <memory>
 #include <sstream>
@@ -41,17 +42,34 @@ Type TypeChecker::find_id_type(std::string& identifier) {
     return ast->no_type;
 }
 
+Methods* TypeChecker::find_nearest_methods_containing(Type t, std::string& method) {
+    while (t != ast->no_type) {
+        Methods *curr = ast->get_class(t)->get_methods();
+        if (curr->contains(method)) {
+            return curr;
+        }
+        t = ast->get_parent(t);
+    }
+    return nullptr;
+}
+
 any TypeChecker::visitClass(CoolParser::ClassContext *ctx) {
     current = ast->from_name(ctx->classname->getText());
+    visitedMethods.clear();
+    visitedAttrs.clear();
     visitChildren(ctx);
 
     return any {};
 }
 
 any TypeChecker::visitMethod(CoolParser::MethodContext *ctx) {
+    string methodname = ctx->name->getText();
+    if (visitedMethods.count(methodname)) {
+        return any {};
+    }
+    visitedMethods.insert(methodname);
     Methods *methods = ast->get_class(current)->get_methods();
     Attributes *attrs = ast->get_class(current)->get_attributes();
-    std::string methodname = ctx->name->getText();
 
     scopes.push_front({});
     for (auto it = attrs->begin(); it != attrs->end(); ++it) {
@@ -65,25 +83,29 @@ any TypeChecker::visitMethod(CoolParser::MethodContext *ctx) {
 
     visitExpr(ctx->body);
     unique_ptr<Expr> body = move(scratchpad_.top());
+    scratchpad_.pop();
 
     scopes.pop_front();
 
-    if (!ast->is_super(body->get_type(), methods->get_signature(methodname).value().back())) {
+    if (!ast->is_super(body->get_type(), signature.back())) {
         stringstream ss;
-        ss << "In class `" << ast->get_class(current)->get_name() <<
+        ss << "In class `" << ast->get_name(current) <<
             "` method `" << methodname << "`: `" <<
-            ast->get_class(body->get_type())->get_name() << "` is not `" <<
-            ast->get_class(methods->get_signature(methodname).value().back())->get_name() <<
-            "`: type of method body is not a subtype of return type";
+            ast->get_name(body->get_type()) << "` is not `" <<
+            ast->get_name(signature.back()) << "`: type of method body is not a subtype of return type";
         errors.push_back(ss.str());
     }
-    scratchpad_.pop();
     methods->set_body(methodname, move(body));
 
     return any {};
 }
 
 any TypeChecker::visitAttr(CoolParser::AttrContext *ctx) {
+    string attrname = ctx->define()->OBJECTID()->getText();
+    if (visitedAttrs.count(attrname)) {
+        return any {};
+    }
+    visitedAttrs.insert(attrname);
     if (ctx->expr()) {
         Attributes *attrs = ast->get_class(current)->get_attributes();
         scopes.push_front({});
@@ -98,14 +120,13 @@ any TypeChecker::visitAttr(CoolParser::AttrContext *ctx) {
         unique_ptr<Expr> init = move(scratchpad_.top());
         scratchpad_.pop();
 
-        string attrname = ctx->define()->OBJECTID()->getText();
         if (!ast->is_super(init->get_type(), attrs->get_type(attrname).value())) {
             stringstream ss;
-            ss << "In class `" << ast->get_class(current)->get_name() <<
+            ss << "In class `" << ast->get_name(current) <<
                 "` attribute `" << attrname << "`: `" <<
-                ast->get_class(init->get_type())->get_name() <<
+                ast->get_name(init->get_type()) <<
                 "` is not `" <<
-                ast->get_class(attrs->get_type(attrname).value())->get_name() <<
+                ast->get_name(attrs->get_type(attrname).value()) <<
                 "`: type of initialization expression is not a subtype of declared type";
             errors.push_back(ss.str());
         }
@@ -134,41 +155,84 @@ any TypeChecker::visitExpr(CoolParser::ExprContext *ctx) {
 }
 
 any TypeChecker::visitMemDispatch(CoolParser::ExprContext *ctx) {
+    // TODO: in dire need of refactoring
     string methodname = ctx->name->getText();
+    vector<unique_ptr<Expr>> args;
     visitExpr(ctx->obj);
     unique_ptr<Expr> obj = move(scratchpad_.top());
     scratchpad_.pop();
 
+    if (obj->get_type() == ast->error_type) {
+        scratchpad_.push(make_unique<DynamicDispatch>(
+            move(obj),
+            methodname,
+            move(args),
+            -2 // TODO: ast->error_type
+        ));
+        return any {};
+    }
+
     Type dispatch_type = obj->get_type();
     if (ctx->type()) {
         string vartypename = ctx->type()->TYPEID()->getText();
-        if (!ast->contains(vartypename)) {
+        if (vartypename == "SELF_TYPE") { }
+        else if (!ast->contains(vartypename)) {
             stringstream ss;
-
+            ss << "Undefined type `" << vartypename << "` in static method dispatch";
             errors.push_back(ss.str());
-            dispatch_type = ast->error_type;
         }
         else {
             dispatch_type = ast->from_name(vartypename);
         }
+
+        if (!ast->is_super(obj->get_type(), dispatch_type)) {
+            stringstream ss;
+            ss << "`" << ast->get_name(obj->get_type()) <<
+                "` is not a subtype of `" << vartypename << "`";
+            errors.push_back(ss.str());
+        }
     }
 
-    vector<Type> signature = ast->get_class(dispatch_type)->get_methods()->get_signature(methodname).value();
+    Methods *methods = find_nearest_methods_containing(dispatch_type, methodname);
+    if (!methods) {
+        stringstream ss;
+
+        ss << "Method `" << methodname << "` not defined for type `" << ast->get_name(dispatch_type) << "` in " << (ctx->type() ? "static" : "dynamic") << " dispatch";
+        errors.push_back(ss.str());
+
+        scratchpad_.push(make_unique<DynamicDispatch>(
+            move(obj),
+            methodname,
+            move(args),
+            -2 // TODO: ast->error_type
+        ));
+        return any {};
+    }
+    vector<Type> signature = methods->get_signature(methodname).value();
 
     Type ret_type = signature.back();
-    vector<unique_ptr<Expr>> args;
-    for (int i = 0; i < ctx->args.size(); i++) {
-        visitExpr(ctx->args[i]);
-        unique_ptr<Expr> arg = move(scratchpad_.top());
-        scratchpad_.pop();
+    if (ctx->args.size() + 1 != signature.size()) {
+        stringstream ss;
+        ss << "Method `" << methodname << "` of type `" <<
+            ast->get_name(dispatch_type) << "` called with the wrong number of arguments; " <<
+            signature.size() - 1 << " arguments expected, but " <<
+            ctx->args.size() << " provided";
+        errors.push_back(ss.str());
+    }
+    else {
+        for (int i = 0; i < ctx->args.size(); i++) {
+            visitExpr(ctx->args[i]);
+            unique_ptr<Expr> arg = move(scratchpad_.top());
+            scratchpad_.pop();
 
-        if (!ast->is_super(arg->get_type(), signature[i])) {
-            stringstream ss;
-            // TODO:
-            errors.push_back(ss.str());
-            ret_type = ast->error_type;
+            if (!ast->is_super(arg->get_type(), signature[i])) {
+                stringstream ss;
+                // TODO:
+                errors.push_back(ss.str());
+                ret_type = ast->error_type;
+            }
+            args.push_back(move(arg));
         }
-        args.push_back(move(arg));
     }
 
     if (ctx->type()) {
@@ -194,9 +258,20 @@ any TypeChecker::visitMemDispatch(CoolParser::ExprContext *ctx) {
 
 any TypeChecker::visitDispatch(CoolParser::ExprContext *ctx) {
     string methodname = ctx->name->getText();
-    vector<Type> signature = ast->get_class(current)->get_methods()->get_signature(methodname).value();
-    Type ret_type = signature.back();
     vector<unique_ptr<Expr>> args;
+    Methods *methods = find_nearest_methods_containing(current, methodname);
+    if (!methods) {
+        stringstream ss;
+        errors.push_back(ss.str());
+        scratchpad_.push(make_unique<MethodInvocation>(
+            methodname,
+            move(args),
+            -2 // TODO: ast->error_type
+        ));
+        return any{};
+    }
+    vector<Type> signature = methods->get_signature(methodname).value();
+    Type ret_type = signature.back();
     for (int i = 0; i < ctx->args.size(); i++) {
         visitExpr(ctx->args[i]);
         unique_ptr<Expr> arg = move(scratchpad_.top());
@@ -235,7 +310,7 @@ any TypeChecker::visitIf(CoolParser::IfContext *ctx) {
     Type ret_type = ast->lub(ifexpr->get_type(), elseexpr->get_type());
     if (!ast->is_super(cond->get_type(), bool_type)) {
         stringstream ss;
-        ss << "Type `" << ast->get_class(cond->get_type())->get_name() << "` of if-then-else-fi condition is not `Bool`";
+        ss << "Type `" << ast->get_name(cond->get_type()) << "` of if-then-else-fi condition is not `Bool`";
         errors.push_back(ss.str());
         ret_type = ast->error_type;
     }
@@ -260,7 +335,7 @@ any TypeChecker::visitWhile(CoolParser::WhileContext *ctx) {
     Type ret_type = obj_type;
     if (!ast->is_super(cond->get_type(), bool_type)) {
         stringstream ss;
-        ss << "Type `" << ast->get_class(cond->get_type())->get_name() << "` of while-loop-pool condition is not `Bool`";
+        ss << "Type `" << ast->get_name(cond->get_type()) << "` of while-loop-pool condition is not `Bool`";
         errors.push_back(ss.str());
         ret_type = ast->error_type;
     }
@@ -298,7 +373,10 @@ any TypeChecker::visitLet(CoolParser::LetContext *ctx) {
         string varname = letdef->define()->OBJECTID()->getText();
         string vartypename = letdef->define()->type()->TYPEID()->getText();
         Type vartype;
-        if (!ast->contains(vartypename)) {
+        if (vartypename == "SELF_TYPE") {
+            vartype = ast->self_type(current);
+        }
+        else if (!ast->contains(vartypename)) {
             stringstream ss;
 
             errors.push_back(ss.str());
@@ -316,7 +394,7 @@ any TypeChecker::visitLet(CoolParser::LetContext *ctx) {
             if (!ast->is_super(init->get_type(), vartype)) {
                 stringstream ss;
                 ss << "Initializer for variable `" << varname <<
-                    "` in let-in expression is of type `" << ast->get_class(init->get_type())->get_name() <<
+                    "` in let-in expression is of type `" << ast->get_name(init->get_type()) <<
                     "` which is not a subtype of the declared type `" << vartypename << "`";
                 errors.push_back(ss.str());
             }
@@ -405,7 +483,10 @@ any TypeChecker::visitUnop(CoolParser::ExprContext *ctx) {
         ctx->unop->getText()[1] == 'e') {
         string typename_ = ctx->type()->TYPEID()->getText();
         Type ret_type;
-        if (!ast->contains(typename_)) {
+        if (typename_ == "SELF_TYPE") {
+            ret_type = ast->self_type(current);
+        }
+        else if (!ast->contains(typename_)) {
             stringstream ss;
             ss << "Attempting to instantiate unknown class `" << typename_ << "`";
             errors.push_back(ss.str());
@@ -436,7 +517,7 @@ any TypeChecker::visitUnop(CoolParser::ExprContext *ctx) {
             if (!ast->is_super(arg->get_type(), bool_type)) {
                 stringstream ss;
                 ss << "Argument of boolean negation is not of type `Bool`, but of type `"
-                    << ast->get_class(arg->get_type())->get_name() << "`";
+                    << ast->get_name(arg->get_type()) << "`";
                 errors.push_back(ss.str());
                 ret_type = ast->error_type;
             }
@@ -448,7 +529,7 @@ any TypeChecker::visitUnop(CoolParser::ExprContext *ctx) {
             if (!ast->is_super(arg->get_type(), int_type)) {
                 stringstream ss;
                 ss << "Argument of integer negation is not of type `Int`, but of type `"
-                    << ast->get_class(arg->get_type())->get_name() << "`";
+                    << ast->get_name(arg->get_type()) << "`";
                 errors.push_back(ss.str());
                 ret_type = ast->error_type;
             }
@@ -478,16 +559,16 @@ any TypeChecker::visitBinop(CoolParser::ExprContext *ctx) {
             if (!ast->is_super(lhs->get_type(), int_type)) {
                 stringstream ss;
                 ss << "Left-hand-side of arithmetic expression is not of type `Int`, but of type `"
-                    << ast->get_class(lhs->get_type())->get_name() << "`";
+                    << ast->get_name(lhs->get_type()) << "`";
                 errors.push_back(ss.str());
-                ret_type = ast->error_type;
+                // ret_type = ast->error_type;
             }
             if (!ast->is_super(rhs->get_type(), int_type)) {
                 stringstream ss;
                 ss << "Right-hand-side of arithmetic expression is not of type `Int`, but of type `"
-                    << ast->get_class(rhs->get_type())->get_name() << "`";
+                    << ast->get_name(rhs->get_type()) << "`";
                 errors.push_back(ss.str());
-                ret_type = ast->error_type;
+                // ret_type = ast->error_type;
             }
 
             Arithmetic::Kind kind;
@@ -514,14 +595,14 @@ any TypeChecker::visitBinop(CoolParser::ExprContext *ctx) {
             if (!ast->is_super(lhs->get_type(), int_type)) {
                 stringstream ss;
                 ss << "Left-hand-side of integer comparison is not of type `Int`, but of type `"
-                    << ast->get_class(lhs->get_type())->get_name() << "`";
+                    << ast->get_name(lhs->get_type()) << "`";
                 errors.push_back(ss.str());
                 ret_type = ast->error_type;
             }
             if (!ast->is_super(rhs->get_type(), int_type)) {
                 stringstream ss;
                 ss << "Right-hand-side of integer comparison is not of type `Int`, but of type `"
-                    << ast->get_class(rhs->get_type())->get_name() << "`";
+                    << ast->get_name(rhs->get_type()) << "`";
                 errors.push_back(ss.str());
                 ret_type = ast->error_type;
             }
@@ -537,10 +618,10 @@ any TypeChecker::visitBinop(CoolParser::ExprContext *ctx) {
                     lhs->get_type() == ast->from_name("String")) {
                 if (lhs->get_type() != rhs->get_type()) {
                     stringstream ss;
-                    ss << "A `" << ast->get_class(lhs->get_type())->get_name() <<
+                    ss << "A `" << ast->get_name(lhs->get_type()) <<
                         "` can only be compared to another `" <<
-                        ast->get_class(lhs->get_type())->get_name() << "` and not to a `" <<
-                        ast->get_class(rhs->get_type())->get_name() << "`";
+                        ast->get_name(lhs->get_type()) << "` and not to a `" <<
+                        ast->get_name(rhs->get_type()) << "`";
                     errors.push_back(ss.str());
                     ret_type = ast->error_type;
                 }
@@ -569,11 +650,11 @@ any TypeChecker::visitAssign(CoolParser::ExprContext *ctx) {
     }
     else if (!ast->is_super(init->get_type(), var_type)) {
         stringstream ss;
-        ss << "In class `" << ast->get_class(current)->get_name() <<
+        ss << "In class `" << ast->get_name(current) <<
             "` assignee `" << var_name << "`: `" <<
-            ast->get_class(init->get_type())->get_name() <<
+            ast->get_name(init->get_type()) <<
             "` is not `" <<
-            ast->get_class(var_type)->get_name() <<
+            ast->get_name(var_type) <<
             "`: type of initialization expression is not a subtype of object type";
         errors.push_back(ss.str());
         // NOTE: bogus
@@ -587,7 +668,7 @@ any TypeChecker::visitAssign(CoolParser::ExprContext *ctx) {
 any TypeChecker::visitObject(CoolParser::ObjectContext *ctx) {
     if (ctx->SELF()) {
         scratchpad_.push(
-            make_unique<ObjectReference>("self", current)
+            make_unique<ObjectReference>("self", ast->self_type(current))
         );
         return std::any {};
     }

@@ -8,21 +8,20 @@ class    : CLASS classname=TYPEID (INHERITS inherit=TYPEID)? '{' (feature';')* '
 
 feature  : attr | method ;
 
-type     : TYPEID | SELF_TYPE ;
-define   : OBJECTID ':' type;
+define   : OBJECTID ':' TYPEID;
 
 formal   : define ;
-method   : name=OBJECTID '(' (formal (',' formal)*)? ')' ':' type '{' body=expr '}' ;
+method   : name=OBJECTID '(' (formal (',' formal)*)? ')' ':' TYPEID '{' body=expr '}' ;
 attr     : define ('<-' expr)? ;
 
-expr     : obj=expr ('@' type)? '.' name=OBJECTID '(' (args+=expr (',' args+=expr)* )? ')'
+expr     : obj=expr ('@' TYPEID)? '.' name=OBJECTID '(' (args+=expr (',' args+=expr)* )? ')'
          | name=OBJECTID '(' (args+=expr (',' args+=expr)* )? ')'
          | if
          | while
          | let
          | block
          | case
-         | unop=NEW type
+         | unop=NEW TYPEID
          | unop='~' expr
          | unop=ISVOID expr
          | expr binop=('*' | '/') expr
@@ -45,7 +44,7 @@ let      : LET letdef (',' letdef)* IN expr ;
 branch   : define '=>' expr ';' ;
 case     : CASE expr OF branch+ ESAC ;
 paren    : '(' expr ')' ;
-object   : OBJECTID | SELF ;
+object   : OBJECTID ;
 integer  : INT_CONST ;
 bool     : BOOL_CONST ;
 string   : STR_CONST ;

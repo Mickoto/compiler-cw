@@ -27,12 +27,15 @@ public:
     Type add(const std::string& classname);
     Type insert(const std::string& classname, Type super);
 
-    std::vector<Type> get_classes() const;
+    std::vector<Type> get_types() const;
     Type from_name(const std::string& classname) const;
     Class *get_class(Type t);
+    std::string get_name(Type t) const;
     Type get_parent(Type t) const;
-    bool is_super(Type t, Type sup);
-    Type lub(Type t1, Type t2);
+    bool is_super(Type t, Type sup) const;
+    Type lub(Type t1, Type t2) const;
+    Type self_type(Type t) const;
+    bool is_self_type(Type t) const;
 };
 
 #endif

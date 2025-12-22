@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "Classes.h"
@@ -21,8 +22,11 @@ class TypeChecker : public CoolParserBaseVisitor {
     CoolLexer *lexer_;
     Type current;
     std::deque<std::unordered_map<std::string, Type>> scopes;
+    std::unordered_set<std::string> visitedMethods;
+    std::unordered_set<std::string> visitedAttrs;
 
     Type find_id_type(std::string& identifier);
+    Methods* find_nearest_methods_containing(Type t, std::string& method);
 
 
   public:

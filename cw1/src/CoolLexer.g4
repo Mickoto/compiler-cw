@@ -298,9 +298,6 @@ SKIP_LETTER : . -> skip;
 // ------------------ identifiers ---------------------
 
 mode DEFAULT_MODE;
-SELF : 'self';
-SELF_TYPE : 'SELF_TPYE';
-
 fragment ID_LETTER : [A-Za-z0-9_];
 TYPEID : [A-Z] ID_LETTER* { assoc_typeid_with_token(getText()); };
 OBJECTID : [a-z] ID_LETTER* { assoc_objid_with_token(getText()); };

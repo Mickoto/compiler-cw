@@ -138,20 +138,9 @@ class TreePrinter : public CoolParserBaseVisitor {
         return any{};
     }
 
-    any visitType(CoolParser::TypeContext *ctx) override {
-        if (ctx->TYPEID()) {
-            cout << indent() << ctx->TYPEID()->getText() << endl;
-        }
-        else {
-            cout << indent() << "SELF_TYPE" << endl;
-        }
-
-        return any{};
-    }
-
     any visitDefine(CoolParser::DefineContext *ctx) override {
         cout << indent() << ctx->OBJECTID()->getText() << endl;
-        visitType(ctx->type());
+        cout << indent() << ctx->TYPEID()->getText() << endl;
 
         return any{};
     }
@@ -174,7 +163,7 @@ class TreePrinter : public CoolParserBaseVisitor {
         for (auto formal : ctx->formal()) {
             visitFormal(formal);
         }
-        visitType(ctx->type());
+        cout << indent() << ctx->TYPEID()->getText() << endl;
         visitExpr(ctx->body);
         indent_level -= 2;
 
@@ -217,15 +206,15 @@ class TreePrinter : public CoolParserBaseVisitor {
 
     any visitMemDispatch(CoolParser::ExprContext *ctx) {
         cout << indent() << '#' << ctx->getStop()->getLine() << endl;
-        if (ctx->type())
+        if (ctx->TYPEID())
             cout << indent() << "_static_dispatch" << endl;
         else
             cout << indent() << "_dispatch" << endl;
 
         indent_level += 2;
         visitExpr(ctx->obj);
-        if (ctx->type())
-            visitType(ctx->type());
+        if (ctx->TYPEID())
+            cout << indent() << ctx->TYPEID()->getText() << endl;
         cout << indent() << ctx->name->getText() << endl;
         cout << indent() << '(' << endl;
         for (auto arg : ctx->args) {
@@ -345,6 +334,9 @@ class TreePrinter : public CoolParserBaseVisitor {
         cout << indent() << '#' << ctx->getStop()->getLine() << endl;
         if (ctx->NEW()) {
             cout << indent() << "_new" << endl;
+            indent_level += 2;
+            cout << indent() << ctx->TYPEID()->getText() << endl;
+            indent_level -= 2;
         } else if (ctx->COMPL()) {
             cout << indent() << "_neg" << endl;
         } else if (ctx->ISVOID()) {

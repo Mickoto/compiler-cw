@@ -51,10 +51,6 @@ string cool_token_to_string(Token *token) {
         case CoolLexer::TYPEID : return "TYPEID" ;
         case CoolLexer::OBJECTID : return "OBJECTID" ;
 
-        // self и SELF_TYPE
-        case CoolLexer::SELF : return "SELF" ;
-        case CoolLexer::SELF_TYPE : return "SELF_TYPE" ;
-
         // ключови думи
         case CoolLexer::CLASS : return "CLASS" ;
         case CoolLexer::ELSE : return "ELSE" ;
