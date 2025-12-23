@@ -11,14 +11,14 @@
 class StaticDispatch : public Expr {
   private:
     std::unique_ptr<Expr> target_;
-    int static_dispatch_type_;
+    Type static_dispatch_type_;
     std::string method_name_;
     std::vector<std::unique_ptr<Expr>> arguments_;
 
   public:
     StaticDispatch(std::unique_ptr<Expr> target, Type static_dispatch_type,
                    std::string method_name,
-                   std::vector<std::unique_ptr<Expr>> arguments, int type)
+                   std::vector<std::unique_ptr<Expr>> arguments, Type type)
         : Expr(type), target_(std::move(target)),
           static_dispatch_type_(static_dispatch_type),
           method_name_(std::move(method_name)),

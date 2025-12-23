@@ -69,6 +69,18 @@ any ExprCollector::visitClass(CoolParser::ClassContext *ctx) {
     return any {};
 }
 
+void ExprCollector::scope_attributes() {
+    scopes.front().insert({ "self", (const Type)ast->self_type });
+    Type t = current;
+    while (t != ast->no_type) {
+        Attributes *attrs = ast->get_class(t)->get_attributes();
+        for (auto it = attrs->begin(); it != attrs->end(); ++it) {
+            scopes.front().insert({ it->get_name(), it->get_type() });
+        }
+        t = ast->get_parent(t);
+    }
+}
+
 any ExprCollector::visitMethod(CoolParser::MethodContext *ctx) {
     string methodname = ctx->name->getText();
 
@@ -77,17 +89,13 @@ any ExprCollector::visitMethod(CoolParser::MethodContext *ctx) {
     }
     visitedMethods.insert(methodname);
 
-    Methods *methods = ast->get_class(current)->get_methods();
-    Attributes *attrs = ast->get_class(current)->get_attributes();
-
     scopes.push_front({});
-    for (auto it = attrs->begin(); it != attrs->end(); ++it) {
-        scopes.front().insert({ it->get_name(), it->get_type() });
-    }
 
+    scope_attributes();
+
+    Methods *methods = ast->get_class(current)->get_methods();
     std::vector<std::string> argnames = methods->get_argument_names(methodname);
     std::vector<Type> signature = methods->get_signature(methodname).value();
-    scopes.front().insert({ "self", (const Type)ast->self_type });
     for (int i = 0; i < argnames.size(); i++) {
         scopes.front().insert({ argnames[i], signature[i] });
     }
@@ -121,9 +129,7 @@ any ExprCollector::visitAttr(CoolParser::AttrContext *ctx) {
         Attributes *attrs = ast->get_class(current)->get_attributes();
 
         scopes.push_front({});
-        for (auto it = attrs->begin(); it != attrs->end(); ++it) {
-            scopes.front().insert({ it->get_name(), it->get_type() });
-        }
+        scope_attributes();
 
         unique_ptr<Expr> init = buildExpr(ctx->expr());
 
@@ -158,7 +164,9 @@ any ExprCollector::visitExpr(CoolParser::ExprContext *ctx) {
     } else if (ctx->ASSIGN()) {
         visitAssign(ctx);
     }
-    visitChildren(ctx);
+    else {
+        visitChildren(ctx);
+    }
 
     return any {};
 }
@@ -171,6 +179,7 @@ void ExprCollector::visitMemDispatch(CoolParser::ExprContext *ctx) {
     Type dispatch_type;
     Methods *methods;
     vector<Type> signature;
+    bool invalid_call = false;
 
     if (obj->get_type() == ast->error_type) {
         goto abort;
@@ -183,7 +192,8 @@ void ExprCollector::visitMemDispatch(CoolParser::ExprContext *ctx) {
             stringstream ss;
             ss << "Undefined type `" << vartypename << "` in static method dispatch";
             errors.push_back(ss.str());
-            goto abort;
+            // NOTE: bogus
+            // goto abort;
         }
         else {
             dispatch_type = ast->from_name(vartypename);
@@ -222,13 +232,20 @@ void ExprCollector::visitMemDispatch(CoolParser::ExprContext *ctx) {
         goto abort;
     }
     for (int i = 0; i < ctx->args.size(); i++) {
-        visitExpr(ctx->args[i]);
-        unique_ptr<Expr> arg = move(scratchpad_.top());
-        scratchpad_.pop();
+        unique_ptr<Expr> arg = buildExpr(ctx->args[i]);
 
         if (!ast->is_super(current, arg->get_type(), signature[i])) {
             stringstream ss;
-            // TODO:
+            if (!invalid_call) {
+                stringstream ss2;
+                ss2 << "Invalid call to method `" << methodname << "` from class `" <<
+                    ast->get_name(dispatch_type) << "`:";
+                errors.push_back(ss2.str());
+                invalid_call = true;
+            }
+            ss << "  `" << ast->get_name(arg->get_type()) << "` is not a subtype of `" <<
+                ast->get_name(signature[i]) << "`: argument at position " <<
+                i << " (0-indexed) has the wrong type";
             errors.push_back(ss.str());
             ret_type = ast->error_type;
         }
@@ -385,7 +402,7 @@ any ExprCollector::visitLet(CoolParser::LetContext *ctx) {
         }
 
         if (letdef->expr()) {
-            unique_ptr<Expr> init = buildExpr(ctx->expr());
+            unique_ptr<Expr> init = buildExpr(letdef->expr());
 
             if (!ast->is_super(current, init->get_type(), vartype)) {
                 stringstream ss;
@@ -432,7 +449,14 @@ any ExprCollector::visitCase(CoolParser::CaseContext *ctx) {
         Type vartype;
 
         scopes.push_front({});
-        if (!ast->contains(vartypename)) {
+        if (vartypename == "SELF_TYPE") {
+            stringstream ss;
+            ss << "`" << varname << "` in case-of-esac declared to be of type `SELF_TYPE` which is not allowed";
+            errors.push_back(ss.str());
+            vartype = ast->error_type;
+
+        }
+        else if (!ast->contains(vartypename)) {
             stringstream ss;
             ss << "Option `" << varname <<
                 "` in case-of-esac declared to have unknown type `" << vartypename << "`";
@@ -671,7 +695,7 @@ void ExprCollector::visitAssign(CoolParser::ExprContext *ctx) {
             "`: type of initialization expression is not a subtype of object type";
         errors.push_back(ss.str());
         // NOTE: bogus
-        ret_type = ast->error_type;
+        ret_type = var_type;
     }
     scratchpad_.push(make_unique<Assignment>(var_name, move(init), ret_type));
 }

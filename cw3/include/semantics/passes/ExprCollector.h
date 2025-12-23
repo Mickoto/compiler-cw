@@ -28,6 +28,7 @@ class ExprCollector : public CoolParserBaseVisitor {
     Type find_id_type(std::string& identifier);
     Methods* find_nearest_methods_containing(Type t, std::string& method);
     std::unique_ptr<Expr> buildExpr(CoolParser::ExprContext *ctx);
+    void scope_attributes();
 
   public:
     virtual std::any visitClass(CoolParser::ClassContext *ctx) override;

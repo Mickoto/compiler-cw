@@ -2,7 +2,80 @@
 #include <sstream>
 
 void FeatureCollector::initialize_base_classes() {
-    // TODO:
+    Type obj_type = ast->from_name("Object");
+    Type int_type = ast->from_name("Int");
+    Type bool_type = ast->from_name("Bool");
+    Type string_type = ast->from_name("String");
+    Type io_type = ast->from_name("IO");
+
+    // Initialize Object
+    Methods *obj_methods = ast->get_class(obj_type)->get_methods();
+    {
+        std::vector<Type> signature({obj_type});
+        std::vector<std::string> args;
+        obj_methods->add_method(Method("abort", signature));
+        obj_methods->set_argument_names("abort", args);
+    }
+    {
+        std::vector<Type> signature({string_type});
+        std::vector<std::string> args;
+        obj_methods->add_method(Method("type_name", signature));
+        obj_methods->set_argument_names("type_name", args);
+    }
+    {
+        std::vector<Type> signature({ast->self_type});
+        std::vector<std::string> args;
+        obj_methods->add_method(Method("copy", signature));
+        obj_methods->set_argument_names("copy", args);
+    }
+
+    // Initialize IO
+    Methods *io_methods = ast->get_class(io_type)->get_methods();
+    {
+        std::vector<Type> signature({string_type, ast->self_type});
+        std::vector<std::string> args({"x"});
+        io_methods->add_method(Method("out_string", signature));
+        io_methods->set_argument_names("out_string", args);
+    }
+    {
+        std::vector<Type> signature({int_type, ast->self_type});
+        std::vector<std::string> args({"x"});
+        io_methods->add_method(Method("out_int", signature));
+        io_methods->set_argument_names("out_int", args);
+    }
+    {
+        std::vector<Type> signature({string_type});
+        std::vector<std::string> args;
+        io_methods->add_method(Method("in_string", signature));
+        io_methods->set_argument_names("in_string", args);
+    }
+    {
+        std::vector<Type> signature({int_type});
+        std::vector<std::string> args;
+        io_methods->add_method(Method("in_int", signature));
+        io_methods->set_argument_names("in_int", args);
+    }
+
+    // Initialize String
+    Methods *string_methods = ast->get_class(string_type)->get_methods();
+    {
+        std::vector<Type> signature({int_type});
+        std::vector<std::string> args;
+        string_methods->add_method(Method("length", signature));
+        string_methods->set_argument_names("length", args);
+    }
+    {
+        std::vector<Type> signature({string_type, string_type});
+        std::vector<std::string> args({"s"});
+        string_methods->add_method(Method("concat", signature));
+        string_methods->set_argument_names("concat", args);
+    }
+    {
+        std::vector<Type> signature({int_type, int_type, string_type});
+        std::vector<std::string> args({"i", "l"});
+        string_methods->add_method(Method("substr", signature));
+        string_methods->set_argument_names("substr", args);
+    }
 }
 
 std::any FeatureCollector::visitClass(CoolParser::ClassContext *ctx) {
@@ -20,6 +93,15 @@ std::any FeatureCollector::visitMethod(CoolParser::MethodContext *ctx) {
     std::vector<std::string> argnames;
     for (auto f : ctx->formal()) {
         std::string typename_ = f->define()->TYPEID()->getText();
+        std::string argname = f->define()->OBJECTID()->getText();
+        if (typename_ == "SELF_TYPE") {
+            std::stringstream ss;
+            ss << "Formal argument `" << argname <<
+                "` declared of type `SELF_TYPE` which is not allowed";
+            errors.push_back(ss.str());
+            fatal_ = true;
+            return std::any {};
+        }
         if (!ast->contains(typename_)) {
             std::stringstream ss;
             ss << "Method `" << methodname << "` in class `" <<
@@ -30,7 +112,7 @@ std::any FeatureCollector::visitMethod(CoolParser::MethodContext *ctx) {
             return std::any {};
         }
         signature.push_back(ast->from_name(typename_));
-        argnames.push_back(f->define()->OBJECTID()->getText());
+        argnames.push_back(argname);
     }
 
     std::string typename_ = ctx->TYPEID()->getText();
@@ -102,6 +184,7 @@ std::any FeatureCollector::visitAttr(CoolParser::AttrContext *ctx) {
 
 std::vector<std::string> FeatureCollector::collect_methods(CoolParser *parser, Classes *classes) {
     ast = classes;
+    initialize_base_classes();
     visitProgram(parser->program());
 
     return errors;
