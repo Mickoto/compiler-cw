@@ -7,7 +7,7 @@
 
 #include "CoolParser.h"
 #include "CoolParserBaseVisitor.h"
-#include "semantics/typed-ast/Classes.h"
+#include "Classes.h"
 
 class FeatureCollector : public CoolParserBaseVisitor {
 private:

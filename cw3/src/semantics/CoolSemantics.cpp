@@ -6,7 +6,7 @@
 
 #include "passes/ClassCollector.h"
 #include "passes/FeatureCollector.h"
-#include "passes/TypeChecker.h"
+#include "passes/ExprCollector.h"
 
 using namespace std;
 
@@ -51,7 +51,8 @@ expected<Classes, vector<string>> CoolSemantics::run() {
 
     // typecheck
     parser_->reset();
-    for (const auto &error : TypeChecker().check(lexer_, parser_, &ast)) {
+    ExprCollector ec;
+    for (const auto &error : ec.check(lexer_, parser_, &ast)) {
         errors.push_back(error);
     }
 

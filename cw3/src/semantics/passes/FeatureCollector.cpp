@@ -35,7 +35,10 @@ std::any FeatureCollector::visitMethod(CoolParser::MethodContext *ctx) {
 
     std::string typename_ = ctx->TYPEID()->getText();
     Type type_;
-    if (!ast->contains(typename_)) {
+    if (typename_ == "SELF_TYPE") {
+        type_ = ast->self_type;
+    }
+    else if (!ast->contains(typename_)) {
         std::stringstream ss;
         ss << "Method `" << methodname << "` in class `" <<
             curr_name << "` declared to have return type `" <<
@@ -68,7 +71,11 @@ std::any FeatureCollector::visitAttr(CoolParser::AttrContext *ctx) {
     std::string attrname = ctx->define()->OBJECTID()->getText();
     Type attrtype;
     std::string typename_ = ctx->define()->TYPEID()->getText();
-    if (!ast->contains(typename_)) {
+
+    if (typename_ == "SELF_TYPE") {
+        attrtype = ast->self_type;
+    }
+    else if (!ast->contains(typename_)) {
         std::stringstream ss;
         ss << "Attribute `" << attrname << "` in class `" <<
             curr_name << "` declared to have type `" <<
