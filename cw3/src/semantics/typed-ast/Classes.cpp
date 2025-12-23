@@ -31,6 +31,8 @@ vector<Type> Classes::get_types() const {
 }
 
 Type Classes::from_name(const std::string& classname) const {
+    if (classname == "SELF_TYPE")
+        return self_type;
     return name_to_idx.at(classname);
 }
 
@@ -39,7 +41,7 @@ Class *Classes::get_class(Type t) {
 }
 
 std::string Classes::get_name(Type t) const {
-    if (is_self_type(t)) {
+    if (t == self_type) {
         return "SELF_TYPE";
     }
     return classes[t].get_name();
@@ -47,15 +49,15 @@ std::string Classes::get_name(Type t) const {
 
 Type Classes::get_parent(Type t) const {
     assert(t >= 0);
-    if (is_self_type(t))
-        return t - classes.size();
     return classes[t].get_parent();
 }
 
-bool Classes::is_super(Type t, Type sup) const {
+bool Classes::is_super(Type context, Type t, Type sup) const {
     if (t == error_type) return true;
-    if (is_self_type(sup))
+    if (sup == self_type)
         return t == sup;
+    if (t == self_type)
+        t = context;
 
     while (t != no_type) {
         if (t == sup) return true;
@@ -64,13 +66,14 @@ bool Classes::is_super(Type t, Type sup) const {
     return t == sup;
 }
 
-Type Classes::lub(Type t1, Type t2) const {
-    if (is_self_type(t1))
-        t1 = get_parent(t1);
-    if (is_self_type(t2))
-        t2 = get_parent(t2);
+Type Classes::lub(Type context, Type t1, Type t2) const {
     if (t1 == error_type) return t2;
     if (t2 == error_type) return t1;
+    if (t1 == self_type && t2 == self_type)
+        return self_type;
+
+    t1 = (t1 == self_type) ? context : t1;
+    t2 = (t2 == self_type) ? context : t2;
 
     std::unordered_set<Type> visited;
     while(t1 != no_type) {
@@ -82,15 +85,4 @@ Type Classes::lub(Type t1, Type t2) const {
         t2 = get_parent(t2);
     }
     return t2;
-}
-
-Type Classes::self_type(Type t) const {
-    assert(t >= 0);
-    assert(t < classes.size());
-
-    return t + classes.size();
-}
-
-bool Classes::is_self_type(Type t) const {
-    return t >= (int)classes.size();
 }

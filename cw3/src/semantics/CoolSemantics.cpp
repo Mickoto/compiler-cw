@@ -19,25 +19,23 @@ expected<Classes, vector<string>> CoolSemantics::run() {
     vector<string> errors;
     Classes ast;
 
-    ClassesCollector cc;
+    ClassCollector cc;
     for (const auto &error : cc.collect(parser_, &ast)) {
         errors.push_back(error);
     }
 
     if (!errors.empty()) {
-        return errors;
+        return unexpected(errors);
     }
 
-    Classes ast = std::move(ret.value());
-
     // check inheritance loops
-    for (const auto &error : checkLoops(ast)) {
+    for (const auto &error : check_loops(ast)) {
         errors.push_back(error);
     }
 
     // collect features
     parser_->reset();
-    MethodCollector mc;
+    FeatureCollector mc;
     for (const auto &error : mc.collect_methods(parser_, &ast)) {
         errors.push_back(error);
     }
@@ -47,7 +45,7 @@ expected<Classes, vector<string>> CoolSemantics::run() {
     }
 
     // check overwrite correctness
-    for (const auto &error : checkOverwrites(ast)) {
+    for (const auto &error : check_overwrites(ast)) {
         errors.push_back(error);
     }
 
@@ -55,6 +53,10 @@ expected<Classes, vector<string>> CoolSemantics::run() {
     parser_->reset();
     for (const auto &error : TypeChecker().check(lexer_, parser_, &ast)) {
         errors.push_back(error);
+    }
+
+    if (!errors.empty()) {
+        return unexpected(errors);
     }
 
     // return the typed AST
@@ -77,29 +79,29 @@ std::string print_inheritance_loops_error(vector<vector<std::string>> inheritanc
     return eout.str();
 }
 
-vector<std::string> checkLoops(Classes &tree) {
-        vector<std::string> errors;
+vector<std::string> check_loops(Classes &tree) {
+    vector<std::string> errors;
 
-        std::unordered_set<Type> cycle_classes;
-        vector<vector<std::string>> cycles;
-        for (Type t : tree.get_types()) {
-                     if (cycle_classes.count(t)) continue;
+    std::unordered_set<Type> cycle_classes;
+    vector<vector<std::string>> cycles;
+    for (Type t : tree.get_types()) {
+        if (cycle_classes.count(t)) continue;
         Type curr = tree.get_parent(t);
-                     std::unordered_set<Type> visited;
-                     visited.insert(t);
+        std::unordered_set<Type> visited;
+        visited.insert(t);
         while (curr != tree.no_type) {
-                         if (visited.count(curr)) {
-                             Type end = curr;
-                             vector<std::string> cycle;
-                             do {
-                                 cycle.push_back(tree.get_class(curr)->get_name());
-                                 cycle_classes.insert(curr);
-                                 curr = tree.get_parent(curr);
-                             }
-                             while (curr != end);
-                             cycles.push_back(cycle);
-                             break;
-                         }
+            if (visited.count(curr)) {
+                Type end = curr;
+                vector<std::string> cycle;
+                do {
+                    cycle.push_back(tree.get_name(curr));
+                    cycle_classes.insert(curr);
+                    curr = tree.get_parent(curr);
+                }
+                while (curr != end);
+                cycles.push_back(cycle);
+                break;
+            }
             visited.insert(curr);
             curr = tree.get_parent(curr);
         }
@@ -111,7 +113,7 @@ vector<std::string> checkLoops(Classes &tree) {
     return errors;
 }
 
-std::vector<std::string> checkOverwrites(Classes &ast) {
+std::vector<std::string> check_overwrites(Classes &ast) {
     std::vector<std::string> errors;
 
     for (Type t : ast.get_types()) {

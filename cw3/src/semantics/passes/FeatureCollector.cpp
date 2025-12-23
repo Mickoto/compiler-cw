@@ -14,61 +14,45 @@ std::any FeatureCollector::visitClass(CoolParser::ClassContext *ctx) {
 
 std::any FeatureCollector::visitMethod(CoolParser::MethodContext *ctx) {
     Methods *methods = ast->get_class(current)->get_methods();
-    std::string classname_ = ast->get_class(current)->get_name();
+    std::string curr_name = ast->get_name(current);
     std::string methodname = ctx->name->getText();
     std::vector<Type> signature;
     std::vector<std::string> argnames;
     for (auto f : ctx->formal()) {
-        auto *type = f->define()->type();
-        if (type->SELF_TYPE()) {
-            signature.push_back(current);
-            argnames.push_back(f->define()->OBJECTID()->getText());
-        }
-        else {
-            std::string typename_ = type->TYPEID()->getText();
-            if (!ast->contains(typename_)) {
-                std::stringstream ss;
-                ss << "Method `" << methodname << "` in class `" <<
-                    classname_ << "` declared to have an argument of type `" <<
-                    typename_ <<"` which is undefined";
-                errors.push_back(ss.str());
-                fatal_ = true;
-                return std::any {};
-            }
-            signature.push_back(ast->from_name(typename_));
-            argnames.push_back(f->define()->OBJECTID()->getText());
-        }
-    }
-
-    auto *type = ctx->type();
-    if (type->SELF_TYPE()) {
-        signature.push_back(current);
-    }
-    else {
-        std::string typename_ = type->TYPEID()->getText();
-        Type type_;
-        if (typename_ == "SELF_TYPE") {
-            type_ = ast->self_type(current);
-        }
-        else if (!ast->contains(typename_)) {
+        std::string typename_ = f->define()->TYPEID()->getText();
+        if (!ast->contains(typename_)) {
             std::stringstream ss;
             ss << "Method `" << methodname << "` in class `" <<
-                classname_ << "` declared to have return type `" <<
+                curr_name << "` declared to have an argument of type `" <<
                 typename_ <<"` which is undefined";
             errors.push_back(ss.str());
             fatal_ = true;
             return std::any {};
         }
-        else {
-            type_ = ast->from_name(typename_);
-        }
-        signature.push_back(type_);
+        signature.push_back(ast->from_name(typename_));
+        argnames.push_back(f->define()->OBJECTID()->getText());
     }
+
+    std::string typename_ = ctx->TYPEID()->getText();
+    Type type_;
+    if (!ast->contains(typename_)) {
+        std::stringstream ss;
+        ss << "Method `" << methodname << "` in class `" <<
+            curr_name << "` declared to have return type `" <<
+            typename_ <<"` which is undefined";
+        errors.push_back(ss.str());
+        fatal_ = true;
+        return std::any {};
+    }
+    else {
+        type_ = ast->from_name(typename_);
+    }
+    signature.push_back(type_);
 
     if (methods->contains(methodname)) {
         std::stringstream ss;
         ss << "Method `" << methodname
-            << "` already defined for class `" << classname_ << "`";
+            << "` already defined for class `" << curr_name << "`";
         errors.push_back(ss.str());
         return std::any {};
     }
@@ -80,36 +64,27 @@ std::any FeatureCollector::visitMethod(CoolParser::MethodContext *ctx) {
 
 std::any FeatureCollector::visitAttr(CoolParser::AttrContext *ctx) {
     Attributes *attrs = ast->get_class(current)->get_attributes();
-    std::string classname_ = ast->get_name(current);
+    std::string curr_name = ast->get_name(current);
     std::string attrname = ctx->define()->OBJECTID()->getText();
     Type attrtype;
-    auto *type = ctx->define()->type();
-    if (type->SELF_TYPE()) {
-        attrtype = current;
+    std::string typename_ = ctx->define()->TYPEID()->getText();
+    if (!ast->contains(typename_)) {
+        std::stringstream ss;
+        ss << "Attribute `" << attrname << "` in class `" <<
+            curr_name << "` declared to have type `" <<
+            typename_ <<"` which is undefined";
+        errors.push_back(ss.str());
+        fatal_ = true;
+        return std::any {};
     }
     else {
-        std::string typename_ = type->TYPEID()->getText();
-        if (typename_ == "SELF_TYPE") {
-            attrtype = ast->self_type(current);
-        }
-        else if (!ast->contains(typename_)) {
-            std::stringstream ss;
-            ss << "Attribute `" << attrname << "` in class `" <<
-                classname_ << "` declared to have type `" <<
-                typename_ <<"` which is undefined";
-            errors.push_back(ss.str());
-            fatal_ = true;
-            return std::any {};
-        }
-        else {
-            attrtype = ast->from_name(typename_);
-        }
-
+        attrtype = ast->from_name(typename_);
     }
+
     if (attrs->contains(attrname)) {
         std::stringstream ss;
         ss << "Attribute `" << attrname
-            << "` already defined for class `" << classname_ << "`";
+            << "` already defined for class `" << curr_name << "`";
         errors.push_back(ss.str());
         return std::any {};
     }

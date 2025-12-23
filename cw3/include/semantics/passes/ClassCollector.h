@@ -19,12 +19,12 @@ private:
     Type obj;
     std::vector<std::pair<Type, std::string>> supers;
 
-    void instantiate_base_classes(Classes&);
-    void link_inheritance(Classes&);
+    void instantiate_base_classes();
+    void link_inheritance();
 public:
     virtual std::any visitClass(CoolParser::ClassContext *ctx) override;
 
-    std::expected<Classes, std::vector<std::string>> collect(CoolParser *parser, Classes *ast);
+    std::vector<std::string> collect(CoolParser *parser, Classes *ast);
 };
 
 #endif

@@ -21,7 +21,8 @@ public:
     Classes& operator=(Classes &&) = default;
 
     static const Type no_type = -1;
-    static const Type error_type = -2;
+    static const Type self_type = -2;
+    static const Type error_type = -3;
 
     bool contains(const std::string& classname) const;
     Type add(const std::string& classname);
@@ -32,10 +33,8 @@ public:
     Class *get_class(Type t);
     std::string get_name(Type t) const;
     Type get_parent(Type t) const;
-    bool is_super(Type t, Type sup) const;
-    Type lub(Type t1, Type t2) const;
-    Type self_type(Type t) const;
-    bool is_self_type(Type t) const;
+    bool is_super(Type context, Type t, Type sup) const;
+    Type lub(Type context, Type t1, Type t2) const;
 };
 
 #endif
