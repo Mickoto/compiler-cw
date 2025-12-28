@@ -15,7 +15,7 @@ std::vector<std::string> check_overwrites(Classes &tree);
 std::vector<std::string> checkOverwrites(Classes &classes);
 
 // Runs semantic analysis and returns a list of errors, if any.
-expected<Classes, vector<string>> CoolSemantics::run() {
+expected<unique_ptr<Classes>, vector<string>> CoolSemantics::run() {
     vector<string> errors;
     Classes ast;
 
@@ -61,7 +61,7 @@ expected<Classes, vector<string>> CoolSemantics::run() {
     }
 
     // return the typed AST
-    return std::move(ast);
+    return make_unique<Classes>(std::move(ast));
 }
 
 std::string print_inheritance_loops_error(vector<vector<std::string>> inheritance_loops) {

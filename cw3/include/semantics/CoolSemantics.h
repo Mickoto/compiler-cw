@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "Classes.h"
+#include "semantics/typed-ast/Classes.h"
 #include "CoolLexer.h"
 #include "CoolParser.h"
 
@@ -23,7 +23,7 @@ class CoolSemantics {
     // process.
     //
     // In case of errors, a list of error messages is returned.
-    std::expected<Classes, std::vector<std::string>> run();
+    std::expected<std::unique_ptr<Classes>, std::vector<std::string>> run();
 };
 
 #endif
