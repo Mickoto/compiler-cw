@@ -27,6 +27,9 @@ void emit_p2align(std::ostream &out, int value);
 // Emits a word that is a specific value; also optionally emits a comment.
 void emit_word(std::ostream &out, int value, std::string inline_comment = "");
 
+void emit_byte(std::ostream &out, int value, std::string inline_comment = "");
+void emit_string(std::ostream &out, std::string value, std::string inline_comment = "");
+
 // Emits a word that is the address of a symbol.
 void emit_word(std::ostream &out, std::string symbol);
 
@@ -151,6 +154,8 @@ void emit_push_register(std::ostream &out, Register reg);
 void emit_pop_into_register(std::ostream &out, Register reg);
 
 void emit_gc_tag(std::ostream &out);
+
+void emit_type_tag(std::ostream &out, std::string type_name, int tag);
 
 } // namespace riscv_emit
 

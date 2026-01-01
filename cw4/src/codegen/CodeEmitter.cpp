@@ -49,7 +49,7 @@ void emit_word(ostream &out, int value, string inline_comment) {
 void emit_string(ostream &out, string value, string inline_comment) {
     emit_ident(out);
     emit_directive(out, "string");
-    out << " " << value;
+    out << " \"" << value << "\"";
     if (!inline_comment.empty()) {
         out << "  ";
         emit_comment(out, inline_comment);
@@ -533,5 +533,12 @@ void emit_move_data_between_locations(std::ostream &out, Location src,
 constexpr int GC_TAG = -1;
 
 void emit_gc_tag(ostream &out) { emit_word(out, GC_TAG, "GC tag"); }
+
+void emit_type_tag(std::ostream &out, std::string type_name, int tag) {
+    std::string label_name = "_" + type_name + "_tag";
+    emit_globl(out, label_name);
+    emit_label(out, label_name);
+    emit_word(out, tag);
+}
 
 } // namespace riscv_emit

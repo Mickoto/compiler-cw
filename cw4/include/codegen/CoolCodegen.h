@@ -10,12 +10,12 @@
 class CoolCodegen {
   private:
     std::string file_name_;
-    std::unique_ptr<Classes> class_table_;
+    std::unique_ptr<Classes> ast;
 
   public:
     CoolCodegen(std::string file_name, std::unique_ptr<Classes> class_table)
         : file_name_(std::move(file_name)),
-          class_table_(std::move(class_table)) {}
+          ast(std::move(class_table)) {}
 
     void generate(std::ostream &out);
 };

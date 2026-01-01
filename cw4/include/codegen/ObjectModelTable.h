@@ -1,0 +1,41 @@
+#ifndef CODEGEN_OBJECTMODELTABLE_H
+#define CODEGEN_OBJECTMODELTABLE_H
+
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "semantics/typed-ast/Classes.h"
+
+static const int WORD_SIZE = 4;
+static const int ATTR_START = 2;
+static const int METHOD_START = 0;
+
+struct ObjectModel {
+    struct Feature {
+        std::string owner;
+        std::string name;
+    };
+    std::vector<Feature> all_attrs;
+    std::vector<Feature> all_methods;
+    std::unordered_map<std::string, int> attr_name_to_off;
+    std::unordered_map<std::string, int> method_name_to_off;
+};
+
+class ObjectModelTable {
+public:
+    ObjectModelTable(Classes *ast);
+
+    int get_attr_offset(Type type, const std::string &attr) const;
+    int get_method_offset(Type type, const std::string &method) const;
+
+    std::vector<ObjectModel::Feature> get_all_attrs(Type type) const;
+    std::vector<ObjectModel::Feature> get_all_methods(Type type) const;
+
+    size_t get_size(Type type);
+
+private:
+    std::vector<ObjectModel> models;
+};
+
+#endif // CODEGEN_OBJECTMODELTABLE_H
