@@ -13,7 +13,7 @@ static const int METHOD_START = 0;
 
 struct ObjectModel {
     struct Feature {
-        std::string owner;
+        Type owner;
         std::string name;
     };
     std::vector<Feature> all_attrs;
@@ -32,7 +32,8 @@ public:
     std::vector<ObjectModel::Feature> get_all_attrs(Type type) const;
     std::vector<ObjectModel::Feature> get_all_methods(Type type) const;
 
-    size_t get_size(Type type);
+    bool has_method(Type t, std::string method) const;
+    bool has_attr(Type t, std::string attr) const;
 
 private:
     std::vector<ObjectModel> models;

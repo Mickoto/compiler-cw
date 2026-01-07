@@ -430,6 +430,12 @@ void emit_jump_and_link_register(ostream &out, Register reg) {
     // there. Huge difference.
 }
 
+void emit_return(std::ostream &out) {
+    emit_ident(out);
+    emit_mnemonic(out, Mnemonic::Return);
+    out << endl;
+}
+
 void emit_branch_equal_zero(ostream &out, Register reg, string label) {
     emit_ident(out);
     emit_mnemonic(out, Mnemonic::BranchEqualZero);

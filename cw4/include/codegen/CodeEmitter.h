@@ -124,6 +124,8 @@ void emit_call(std::ostream &out, std::string function_label);
 // Example gen: [    jalr t0\n]
 void emit_jump_and_link_register(std::ostream &out, Register reg);
 
+void emit_return(std::ostream &out);
+
 void emit_branch_equal_zero(std::ostream &out, Register reg, std::string label);
 
 void emit_branch_not_equal_zero(std::ostream &out, Register reg,

@@ -8,12 +8,17 @@ ObjectModel collect_features(Classes *ast, Type t, Type curr, int &attr_off, int
     ObjectModel om = collect_features(ast, t, ast->get_parent(curr), attr_off, method_off);
 
     for (auto attr : ast->get_class(curr)->get_attributes()->get_names()) {
-        om.all_attrs.push_back({ast->get_name(curr), attr});
+        om.all_attrs.push_back({curr, attr});
         om.attr_name_to_off.insert({attr, attr_off++});
     }
     for (auto method : ast->get_class(curr)->get_methods()->get_names()) {
-        om.all_methods.push_back({ast->get_name(curr), method});
-        om.method_name_to_off.insert({method, method_off++});
+        if (om.method_name_to_off.count(method)) {
+            om.all_methods[om.method_name_to_off[method]].owner = curr;
+        }
+        else {
+            om.all_methods.push_back({curr, method});
+            om.method_name_to_off.insert({method, method_off++});
+        }
     }
 
     return om;
@@ -50,6 +55,10 @@ std::vector<ObjectModel::Feature> ObjectModelTable::get_all_methods(Type t) cons
     return std::move(ret);
 }
 
-size_t ObjectModelTable::get_size(Type type) {
-    return (ATTR_START + models[type].all_attrs.size()) * WORD_SIZE;
+bool ObjectModelTable::has_method(Type t, std::string method) const {
+    return models[t].method_name_to_off.count(method);
+}
+
+bool ObjectModelTable::has_attr(Type t, std::string attr) const {
+    return models[t].attr_name_to_off.count(attr);
 }
