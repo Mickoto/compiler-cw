@@ -145,24 +145,24 @@ std::vector<std::string> check_overwrites(Classes &ast) {
         // check methods
         Methods *methods = c->get_methods();
         for (std::string methodname : methods->get_names()) {
-            Type earliest = ast.no_type;
+            Type earliest = t;
             Type par = ast.get_parent(t);
             while (par != ast.no_type) {
                 Methods *parmethods = ast.get_class(par)->get_methods();
                 if (parmethods->contains(methodname)) {
-                    if (methods->get_signature(methodname) != parmethods->get_signature(methodname)) {
-                        earliest = par;
-                    }
+                    earliest = par;
                 }
                 par = ast.get_parent(par);
             }
-            if (earliest != ast.no_type) {
+            Methods *earliest_methods = ast.get_class(earliest)->get_methods();
+            if (methods->get_signature(methodname) != earliest_methods->get_signature(methodname)) {
                 std::stringstream ss;
                 ss << "Override for method " << methodname << " in class " <<
                     c->get_name() << " has different signature than method in ancestor " <<
                     ast.get_class(earliest)->get_name() << " (earliest ancestor that mismatches)";
                 errors.push_back(ss.str());
             }
+
         }
     }
 

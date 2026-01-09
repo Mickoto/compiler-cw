@@ -30,7 +30,7 @@ class StaticDispatch : public Expr {
     // this static dispatch.
     //
     // Note: different than get_type(): that's the return type of the method.
-    int get_static_dispatch_type() const { return static_dispatch_type_; }
+    Type get_static_dispatch_type() const { return static_dispatch_type_; }
 
     std::string get_method_name() const { return method_name_; }
 

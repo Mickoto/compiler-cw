@@ -740,7 +740,7 @@ any ExprCollector::visitBool(CoolParser::BoolContext *ctx) {
 any ExprCollector::visitString(CoolParser::StringContext *ctx) {
     scratchpad_.push(
         make_unique<StringConstant>(
-            lexer_->get_string_pretty(ctx->STR_CONST()->getSymbol()->getStartIndex()),
+            lexer_->get_string_value(ctx->STR_CONST()->getSymbol()->getStartIndex()),
             ast->from_name("String")
         )
     );

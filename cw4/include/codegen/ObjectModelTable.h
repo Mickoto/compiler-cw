@@ -8,8 +8,10 @@
 #include "semantics/typed-ast/Classes.h"
 
 static const int WORD_SIZE = 4;
-static const int ATTR_START = 2;
+static const int ATTR_START = 3;
 static const int METHOD_START = 0;
+
+static const int DISP_TABLE_OFF = 8;
 
 struct ObjectModel {
     struct Feature {

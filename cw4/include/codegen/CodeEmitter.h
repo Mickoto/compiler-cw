@@ -46,6 +46,8 @@ void emit_multiply(std::ostream &out, Register dest, Register lhs,
 
 void emit_divide(std::ostream &out, Register dest, Register lhs, Register rhs);
 
+void emit_negate(std::ostream &out, Register dest, Register src);
+
 void emit_xor_immediate(std::ostream &out, Register dest, Register lhs,
                         int rhs);
 
@@ -87,6 +89,8 @@ void emit_set_frame_pointer(std::ostream &out);
 //
 // Example gen: [    sw ra, 0(sp)\n]
 void emit_store_word(std::ostream &out, Register src, MemoryLocation dest);
+
+void emit_load_immediate(std::ostream &out, Register dest, int imm);
 
 // Emits a "load word" instruction that loads into the `dest` register the word
 // at memory location `src`. Uses the concrete instsruction/mnemonic `lw`.
@@ -136,6 +140,12 @@ void emit_branch_less_than_zero(std::ostream &out, Register reg,
 
 void emit_branch_greater_than_zero(std::ostream &out, Register reg,
                                    std::string label);
+
+void emit_branch_less_than(std::ostream &out, Register lhs,
+                           Register rhs, std::string label);
+
+void emit_branch_less_than_or_equal(std::ostream &out, Register lhs,
+                           Register rhs, std::string label);
 
 // Emits an instruction that adjusts the stack pointer according to the given
 // `num_of_words` that the stack needs to be grown by. The stack grows towards

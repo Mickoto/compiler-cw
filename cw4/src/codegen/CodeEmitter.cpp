@@ -136,6 +136,10 @@ void emit_divide(ostream &out, Register dest, Register lhs, Register rhs) {
     out << endl;
 }
 
+void emit_negate(std::ostream &out, Register dest, Register src) {
+    emit_subtract(out, dest, ZeroRegister {}, src);
+}
+
 void emit_xor_immediate(ostream &out, Register dest, Register lhs, int rhs) {
     emit_ident(out);
     emit_mnemonic(out, Mnemonic::XorImmediate);
@@ -236,6 +240,9 @@ void emit_mnemonic(ostream &out, Mnemonic mnemonic) {
     case Mnemonic::StoreWord:
         out << "sw";
         break;
+    case Mnemonic::LoadImm:
+        out << "li";
+        break;
     case Mnemonic::LoadWord:
         out << "lw";
         break;
@@ -269,6 +276,13 @@ void emit_mnemonic(ostream &out, Mnemonic mnemonic) {
     case Mnemonic::BranchGreaterThanZero:
         out << "bgtz";
         break;
+    case Mnemonic::BranchLessThan:
+        out << "blt";
+        break;
+    case Mnemonic::BranchLessThanOrEqual:
+        out << "ble";
+        break;
+
     default:
         cerr << "ICE: emit_mnemonic has no branch for "
              << static_cast<int>(mnemonic) << endl;
@@ -331,6 +345,16 @@ void emit_store_word(ostream &out, Register src, MemoryLocation dest) {
     emit_register(out, src);
     out << ", ";
     emit_memory_location(out, dest);
+    out << endl;
+}
+
+void emit_load_immediate(std::ostream &out, Register dest, int imm) {
+    emit_ident(out);
+    emit_mnemonic(out, Mnemonic::LoadImm);
+    out << " ";
+    emit_register(out, dest);
+    out << ", ";
+    out << imm;
     out << endl;
 }
 
@@ -471,6 +495,32 @@ void emit_branch_greater_than_zero(ostream &out, Register reg, string label) {
     emit_mnemonic(out, Mnemonic::BranchGreaterThanZero);
     out << " ";
     emit_register(out, reg);
+    out << ", ";
+    out << label;
+    out << endl;
+}
+
+void emit_branch_less_than(std::ostream &out, Register lhs,
+                           Register rhs, std::string label) {
+    emit_ident(out);
+    emit_mnemonic(out, Mnemonic::BranchLessThan);
+    out << " ";
+    emit_register(out, lhs);
+    out << ", ";
+    emit_register(out, rhs);
+    out << ", ";
+    out << label;
+    out << endl;
+}
+
+void emit_branch_less_than_or_equal(std::ostream &out, Register lhs,
+                           Register rhs, std::string label) {
+    emit_ident(out);
+    emit_mnemonic(out, Mnemonic::BranchLessThanOrEqual);
+    out << " ";
+    emit_register(out, lhs);
+    out << ", ";
+    emit_register(out, rhs);
     out << ", ";
     out << label;
     out << endl;

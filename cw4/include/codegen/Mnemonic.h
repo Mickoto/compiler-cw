@@ -12,6 +12,7 @@ enum class Mnemonic {
     SetEqualZero,
     SetLessThan,
     StoreWord,
+    LoadImm,
     LoadWord,
     LoadAddress,
     Jump,
@@ -23,6 +24,8 @@ enum class Mnemonic {
     BranchNotEqualZero,
     BranchLessThanZero,
     BranchGreaterThanZero,
+    BranchLessThan,
+    BranchLessThanOrEqual
 };
 
 #endif

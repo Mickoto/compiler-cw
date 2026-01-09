@@ -10,6 +10,7 @@ using namespace std;
 void emit_dispatch_tables(ostream &out, Classes *ast, ObjectModelTable &omt);
 void emit_class_name_table(ostream &out, Classes *ast, ExprEmitter &ee);
 void emit_object_prototypes(ostream &out, Classes *ast, ExprEmitter &ee);
+void emit_constants(ostream &out, ExprEmitter &ee, ConstantStorage &cs);
 
 void CoolCodegen::generate(ostream &out) {
     ObjectModelTable omt(ast.get());
@@ -23,89 +24,15 @@ void CoolCodegen::generate(ostream &out) {
 
     // data section
     riscv_emit::emit_data_segment_tag(out);
-
     emit_object_prototypes(out, ast.get(), ee);
     emit_dispatch_tables(out, ast.get(), omt);
     emit_class_name_table(out, ast.get(), ee);
-
-    // 8. emit static constants
+    emit_constants(out, ee, cs);
 
     riscv_emit::emit_type_tag(out, "bool", ast->from_name("Bool"));
     riscv_emit::emit_type_tag(out, "int", ast->from_name("Int"));
     riscv_emit::emit_type_tag(out, "string", ast->from_name("String"));
     riscv_emit::emit_empty_line(out);
-
-// .globl Main.main
-// Main.main:
-//     add fp, sp, 0
-//     sw ra, 0(sp)
-//     addi sp, sp, -4
-//
-//     sw fp, 0(sp)
-//     addi sp, sp, -4
-//     la t0, _string1.content
-//     sw t0, 0(sp)
-//     addi sp, sp, -4
-//
-//     jal IO.out_string
-//
-//     lw ra, 0(fp)
-//     addi sp, sp, 8
-//     lw fp, 0(sp)
-//     ret
-// 
-// .data
-// # ----------------- Init methods -----------------------------------------------
-// .globl String_init
-// String_init:
-//
-//     add fp, sp, 0
-//     sw ra, 0(sp)
-//     addi sp, sp, -4
-//
-//     sw s1, 0(sp)
-//     addi sp, sp, -4
-//     add s1, a0, zero
-//
-//     # copy Int prototype first
-//
-//     la a0, Int_protObj
-//     sw fp, 0(sp)
-//     addi sp, sp, -4
-//
-//     call Object.copy
-//
-//     sw a0, 12(s1)      # store new Int as length; value of Int is 0 by default
-//
-//     add a0, s1, zero   # restore String argument
-//
-//     addi sp, sp, 4
-//     lw s1, 0(sp)
-//     lw ra, 0(fp)
-//     addi sp, sp, 8
-//     lw fp, 0(sp)
-//
-//     ret
-//
-// # ------------- Class object table ---------------------------------------------
-// class_objTab:
-//     ...
-//     .word -1 # GC tag
-// _string1.length:
-//     .word 2  # class tag;       2 for Int
-//     .word 4  # object size;     4 words (16 bytes); GC tag not included
-//     .word 0  # dispatch table;  Int has no methods
-//     .word 13  # first attribute; value of Int
-// 
-//     .word -1 # GC tag
-// _string1.content:
-//     .word 4  # class tag;       4 for String
-//     .word 8  # object size;     8 words (16 + 16 bytes); GC tag not included
-//     .word String_dispTab
-//     .word _string1.length # first attribute; pointer length
-//     .string \"hello world!\" # includes terminating null char\n\
-//     .byte 0
-//     .byte 0
 
 }
 
@@ -179,3 +106,17 @@ void emit_object_prototypes(ostream &out, Classes *ast, ExprEmitter &ee) {
     }
 }
 
+void emit_constants(ostream &out, ExprEmitter &ee, ConstantStorage &cs) {
+    for (auto bool_const : cs.get_bool_constants()) {
+        ee.emit_bool_constant(out, bool_const.label, bool_const.value);
+    }
+    riscv_emit::emit_empty_line(out);
+    for (auto int_const : cs.get_int_constants()) {
+        ee.emit_int_constant(out, int_const.label, int_const.value);
+    }
+    riscv_emit::emit_empty_line(out);
+    for (auto string_const : cs.get_string_constants()) {
+        ee.emit_string_constant(out, string_const.label, string_const.value.first, string_const.value.second);
+    }
+    riscv_emit::emit_empty_line(out);
+}

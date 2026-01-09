@@ -31,10 +31,11 @@
 #include "semantics/typed-ast/StaticDispatch.h"
 #include "semantics/typed-ast/StringConstant.h"
 #include "semantics/typed-ast/WhileLoopPool.h"
+#include "semantics/typed-ast/IntegerComparison.h"
 
 class ExprEmitter {
 public:
-    ExprEmitter(Classes *ast, ObjectModelTable *omt, ConstantStorage *cs) : ast(ast), omt(omt), cs(cs) {}
+    ExprEmitter(Classes *ast, ObjectModelTable *omt, ConstantStorage *cs) : ast(ast), omt(omt), cs(cs), label(0) {}
 
     void emit_all_methods(std::ostream& out);
     void emit_all_inits(std::ostream& out);
@@ -53,10 +54,17 @@ private:
     ObjectModelTable *omt;
     ConstantStorage *cs;
 
-    std::deque<std::unordered_map<std::string, std::pair<Type, Location>>> scopes;
-    int fp_off_curr;
+    std::deque<std::unordered_map<std::string, Location>> scopes;
+    Type curr_type;
+    int fp_offset;
+    int label;
 
+    std::string make_unique_label();
     void scope_attrs(Type t);
+    Location find_reference(const std::string &varname);
+    // void emit_scope(std::ostream &out);
+    void emit_push(std::ostream &out, Register reg);
+    void emit_pop(std::ostream &out, Register reg);
     void emit_arithmetic(std::ostream &out, const Arithmetic *expr);
     void emit_assignment(std::ostream &out, const Assignment *expr);
     void emit_bool_constant_expr(std::ostream &out, const BoolConstant *expr);
@@ -66,8 +74,12 @@ private:
     void emit_equality_comparison(std::ostream &out, const EqualityComparison *expr);
     void emit_if_then_else_fi(std::ostream &out, const IfThenElseFi *expr);
     void emit_int_constant_expr(std::ostream &out, const IntConstant *expr);
+    void emit_integer_comparison(std::ostream &out, const IntegerComparison *expr);
     void emit_integer_negation(std::ostream &out, const IntegerNegation *expr);
     void emit_is_void(std::ostream &out, const IsVoid *expr);
+    void emit_new_obj(std::ostream &out, Type t);
+    void emit_new_obj_self_type(std::ostream &out);
+    void emit_vardecl(std::ostream &out, const Vardecl *vardecl);
     void emit_let_in(std::ostream &out, const LetIn *expr);
     void emit_method_invocation(std::ostream &out, const MethodInvocation *expr);
     void emit_new_object(std::ostream &out, const NewObject *expr);
@@ -76,7 +88,6 @@ private:
     void emit_sequence(std::ostream &out, const Sequence *expr);
     void emit_static_dispatch(std::ostream &out, const StaticDispatch *expr);
     void emit_string_constant_expr(std::ostream &out, const StringConstant *expr);
-    // void emit_vardecl(std::ostream &out, const Arithmetic *expr);
     void emit_while_loop_pool(std::ostream &out, const WhileLoopPool *expr);
 };
 

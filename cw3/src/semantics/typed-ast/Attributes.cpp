@@ -47,9 +47,9 @@ std::vector<std::string> Attributes::get_names() {
     return attribute_names;
 }
 
-bool
-Attributes::has_initializer(const std::string &attribute_name) const {
-    return name_to_index_.contains(attribute_name);
+bool Attributes::has_initializer(const std::string &attribute_name) const {
+    return name_to_index_.contains(attribute_name) &&
+        attributes_.at(name_to_index_.at(attribute_name)).has_initializer();
 }
 
 const Expr *

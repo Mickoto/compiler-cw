@@ -23,6 +23,8 @@ class Attribute {
 
     const Expr *get_initializer() const { return initializer_.get(); }
 
+    bool has_initializer() const { return bool(initializer_); }
+
     void set_initializer(std::unique_ptr<Expr> &&expr) {
         initializer_ = std::move(expr);
     }
