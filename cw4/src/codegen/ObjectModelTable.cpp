@@ -40,6 +40,10 @@ int ObjectModelTable::get_method_offset(Type type, const std::string &method) co
     return models[type].method_name_to_off.at(method) * WORD_SIZE;
 }
 
+ObjectModel::Feature ObjectModelTable::find_method(Type type, std::string method_name) {
+    return models[type].all_methods.at(models[type].method_name_to_off.at(method_name));
+}
+
 std::vector<ObjectModel::Feature> ObjectModelTable::get_all_attrs(Type t) const {
     std::vector<ObjectModel::Feature> ret;
     for (auto feat : models[t].all_attrs) {

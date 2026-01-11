@@ -11,6 +11,8 @@ void emit_dispatch_tables(ostream &out, Classes *ast, ObjectModelTable &omt);
 void emit_class_name_table(ostream &out, Classes *ast, ExprEmitter &ee);
 void emit_object_prototypes(ostream &out, Classes *ast, ExprEmitter &ee);
 void emit_constants(ostream &out, ExprEmitter &ee, ConstantStorage &cs);
+void emit_helper_functions(ostream &out);
+void emit_hierarchy_table(ostream &out, Classes *ast);
 
 void CoolCodegen::generate(ostream &out) {
     ObjectModelTable omt(ast.get());
@@ -21,12 +23,14 @@ void CoolCodegen::generate(ostream &out) {
     riscv_emit::emit_text_segment_tag(out);
     ee.emit_all_methods(out);
     ee.emit_all_inits(out);
+    emit_helper_functions(out);
 
     // data section
     riscv_emit::emit_data_segment_tag(out);
     emit_object_prototypes(out, ast.get(), ee);
     emit_dispatch_tables(out, ast.get(), omt);
     emit_class_name_table(out, ast.get(), ee);
+    emit_hierarchy_table(out, ast.get());
     emit_constants(out, ee, cs);
 
     riscv_emit::emit_type_tag(out, "bool", ast->from_name("Bool"));
@@ -107,6 +111,14 @@ void emit_object_prototypes(ostream &out, Classes *ast, ExprEmitter &ee) {
 }
 
 void emit_constants(ostream &out, ExprEmitter &ee, ConstantStorage &cs) {
+    for (auto type_table : cs.get_case_tables()) {
+        riscv_emit::emit_label(out, type_table.label);
+        for (Type t : type_table.value) {
+            riscv_emit::emit_word(out, t);
+        }
+        riscv_emit::emit_word(out, -1);
+    }
+    riscv_emit::emit_empty_line(out);
     for (auto bool_const : cs.get_bool_constants()) {
         ee.emit_bool_constant(out, bool_const.label, bool_const.value);
     }
@@ -117,6 +129,44 @@ void emit_constants(ostream &out, ExprEmitter &ee, ConstantStorage &cs) {
     riscv_emit::emit_empty_line(out);
     for (auto string_const : cs.get_string_constants()) {
         ee.emit_string_constant(out, string_const.label, string_const.value.first, string_const.value.second);
+    }
+    riscv_emit::emit_empty_line(out);
+}
+
+void emit_helper_functions(ostream &out) {
+    out <<
+        "case_get_case:\n"
+            "\tli t4, -1\n"
+            "\tloop1:\n"
+            "\tbeq t1, t4, error\n"
+            "\tadd t0, zero, zero\n"
+            "\tloop2:\n"
+            "\tli t3, 4\n"
+            "\tmul t3, t0, t3\n"
+            "\tadd t3, t3, t2\n"
+            "\tlw t3, 0(t3)\n"
+            "\tbeq t3, t4, endloop2\n"
+            "\tbeq t3, t1, done\n"
+            "\taddi t0, t0, 1\n"
+            "\tj loop2\n"
+            "\tendloop2:\n"
+            "\tli t3, 4\n"
+            "\tmul t3, t3, t1\n"
+            "\tla t5, hierarchy_tab\n"
+            "\tadd t3, t3, t5\n"
+            "\tlw t1, 0(t3)\n"
+            "\tj loop1\n"
+            "\terror:\n"
+            "\tadd t0, t4, zero\n"
+            "\tdone:\n"
+            "\tret\n";
+}
+
+void emit_hierarchy_table(ostream &out, Classes *ast) {
+    riscv_emit::emit_header_comment(out, "Hierarchy table");
+    riscv_emit::emit_label(out, "hierarchy_tab");
+    for (Type t : ast->get_types()) {
+        riscv_emit::emit_word(out, ast->get_parent(t));
     }
     riscv_emit::emit_empty_line(out);
 }

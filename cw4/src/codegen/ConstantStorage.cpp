@@ -1,7 +1,7 @@
 #include "ConstantStorage.h"
 #include <sstream>
 
-std::string ConstantStorage::insert_bool_const(bool val) {
+std::string ConstantStorage::get_bool_const(bool val) {
     return val ? "_bool_true" : "_bool_false";
 }
 
@@ -20,6 +20,11 @@ std::string ConstantStorage::insert_string_const(std::string val) {
         string_constants.push_back({val, int_to_index.at(val.length())});
     }
     return string_const_label(string_to_index.at(val));
+}
+
+std::string ConstantStorage::insert_cases(std::vector<Type> val) {
+    case_tables.push_back(val);
+    return case_table_label(case_tables.size() - 1);
 }
 
 std::vector<Constant<bool>> ConstantStorage::get_bool_constants() {
@@ -42,6 +47,14 @@ std::vector<Constant<std::pair<std::string, std::string>>> ConstantStorage::get_
     return ret;
 }
 
+std::vector<Constant<std::vector<Type>>> ConstantStorage::get_case_tables() {
+    std::vector<Constant<std::vector<Type>>> ret;
+    for (int i = 0; i < case_tables.size(); i++) {
+        ret.push_back({case_table_label(i), case_tables.at(i)});
+    }
+    return ret;
+}
+
 std::string ConstantStorage::int_const_label(int index) {
     std::stringstream ss;
     ss << "_int" << index;
@@ -51,5 +64,11 @@ std::string ConstantStorage::int_const_label(int index) {
 std::string ConstantStorage::string_const_label(int index) {
     std::stringstream ss;
     ss << "_string" << index;
+    return ss.str();
+}
+
+std::string ConstantStorage::case_table_label(int index) {
+    std::stringstream ss;
+    ss << "_cases" << index;
     return ss.str();
 }

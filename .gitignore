@@ -1,9 +1,13 @@
 cw1/build/*
 cw1/gen/*
+cw1/temp/*
 cw2/build/*
 cw2/gen/*
+cw2/temp/*
 cw3/build/*
 cw3/gen/*
+cw3/temp/*
 cw4/build/*
 cw4/gen/*
+cw4/temp/*
 temp

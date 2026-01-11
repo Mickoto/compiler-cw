@@ -3,6 +3,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <iomanip>
+#include <vector>
 
 std::string ExprEmitter::make_unique_label() {
     std::stringstream ss;
@@ -79,7 +80,7 @@ void ExprEmitter::emit_assignment(std::ostream &out, const Assignment *expr) {
 }
 
 void ExprEmitter::emit_bool_constant_expr(std::ostream &out, const BoolConstant *expr) {
-    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->insert_bool_const(expr->get_value()));
+    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->get_bool_const(expr->get_value()));
 }
 
 void ExprEmitter::emit_boolean_negation(std::ostream &out, const BooleanNegation *expr) {
@@ -88,15 +89,73 @@ void ExprEmitter::emit_boolean_negation(std::ostream &out, const BooleanNegation
     emit_expr(out, expr->get_argument());
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {3 * WORD_SIZE, ArgumentRegister {0}});
     riscv_emit::emit_branch_equal_zero(out, TempRegister {0}, false_label);
-    riscv_emit::emit_load_address(out, ArgumentRegister {0}, "_bool_false");
+    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->get_bool_const(false));
     riscv_emit::emit_jump(out, true_label);
     riscv_emit::emit_label(out, false_label);
-    riscv_emit::emit_load_address(out, ArgumentRegister {0}, "_bool_true");
+    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->get_bool_const(true));
     riscv_emit::emit_label(out, true_label);
 }
 
 void ExprEmitter::emit_case_of_esac(std::ostream &out, const CaseOfEsac *expr) {
+    std::string end_label = make_unique_label();
+    std::string error_skip_label = make_unique_label();
+    std::string void_error_label = make_unique_label();
+    std::vector<Type> type_table;
+    scopes.push_front({});
 
+    emit_push(out, SavedRegister {1});
+    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
+
+    for (int i = 0; i < expr->get_cases().size(); i++) {
+        const CaseOfEsac::Case &case_ = expr->get_cases()[i];
+        type_table.push_back(case_.get_type());
+        scopes.front().insert({case_.get_name(), MemoryLocation {fp_offset, FramePointer {}}});
+    }
+
+    emit_expr(out, expr->get_multiplex());
+    riscv_emit::emit_branch_not_equal_zero(out, ArgumentRegister {}, void_error_label);
+    riscv_emit::emit_push_register(out, FramePointer {});
+    // TODO: big todo
+    riscv_emit::emit_load_address(out, TempRegister {0}, "Main_className");
+    riscv_emit::emit_push_register(out, TempRegister {});
+    riscv_emit::emit_load_address(out, TempRegister {0}, cs->insert_int_const(expr->get_line()));
+    riscv_emit::emit_push_register(out, TempRegister {});
+    riscv_emit::emit_jump_and_link(out, "_case_abort_on_void");
+    riscv_emit::emit_label(out, void_error_label);
+
+    emit_push(out, ArgumentRegister {0});
+
+    riscv_emit::emit_load_word(out, TempRegister {1}, MemoryLocation {0, ArgumentRegister {0}});
+    riscv_emit::emit_load_address(out, TempRegister {2}, cs->insert_cases(type_table));
+    riscv_emit::emit_jump_and_link(out, "case_get_case");
+    riscv_emit::emit_move(out, ArgumentRegister {0}, SavedRegister {1});
+
+    riscv_emit::emit_branch_less_than_or_equal(out, ZeroRegister {}, TempRegister {0}, error_skip_label);
+    riscv_emit::emit_push_register(out, FramePointer {});
+    // TODO: big todo
+    riscv_emit::emit_load_address(out, TempRegister {0}, "Main_className");
+    riscv_emit::emit_push_register(out, TempRegister {});
+    riscv_emit::emit_load_address(out, TempRegister {0}, cs->insert_int_const(expr->get_line()));
+    riscv_emit::emit_push_register(out, TempRegister {});
+    riscv_emit::emit_load_address(out, TempRegister {0}, ast->get_name(expr->get_multiplex()->get_type()) + "_className");
+    riscv_emit::emit_push_register(out, TempRegister {});
+    riscv_emit::emit_jump_and_link(out, "_case_abort_no_match");
+    riscv_emit::emit_label(out, error_skip_label);
+
+    for (int i = 0; i < expr->get_cases().size() - 1; i++) {
+        std::string skip_expr_label = make_unique_label();
+        riscv_emit::emit_branch_not_equal_zero(out, TempRegister {0}, skip_expr_label);
+        emit_expr(out, expr->get_cases()[i].get_expr());
+        riscv_emit::emit_jump(out, end_label);
+        riscv_emit::emit_label(out, skip_expr_label);
+        riscv_emit::emit_add_immediate(out, TempRegister {0}, TempRegister {0}, -1);
+    }
+    emit_expr(out, expr->get_cases().back().get_expr());
+    riscv_emit::emit_label(out, end_label);
+    riscv_emit::emit_add_immediate(out, StackPointer {}, StackPointer {}, WORD_SIZE);
+    fp_offset += WORD_SIZE;
+    emit_pop(out, SavedRegister {1});
+    scopes.pop_front();
 }
 
 void ExprEmitter::emit_dynamic_dispatch(std::ostream &out, const DynamicDispatch *expr) {
@@ -113,7 +172,10 @@ void ExprEmitter::emit_dynamic_dispatch(std::ostream &out, const DynamicDispatch
 
     emit_expr(out, expr->get_target());
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {DISP_TABLE_OFF, ArgumentRegister {0}});
-    riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {omt->get_method_offset(expr->get_target()->get_type(), expr->get_method_name()), TempRegister {0}});
+    Type dispatcher_type = expr->get_target()->get_type();
+    // TODO: not really fixing it
+    if (dispatcher_type == ast->self_type) dispatcher_type = curr_type;
+    riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {omt->get_method_offset(dispatcher_type, expr->get_method_name()), TempRegister {0}});
     riscv_emit::emit_jump_and_link_register(out, TempRegister {0});
 
     fp_offset = fp_offset_save;
@@ -166,8 +228,10 @@ void ExprEmitter::emit_integer_comparison(std::ostream &out, const IntegerCompar
     std::string true_label = make_unique_label();
     std::string end_label = make_unique_label();
 
+    emit_push(out, ArgumentRegister {0});
     emit_expr(out, expr->get_lhs());
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {3 * WORD_SIZE, ArgumentRegister {0}});
+    emit_pop(out, ArgumentRegister {0});
     emit_push(out, TempRegister {0});
 
     emit_expr(out, expr->get_rhs());
@@ -182,10 +246,10 @@ void ExprEmitter::emit_integer_comparison(std::ostream &out, const IntegerCompar
             riscv_emit::emit_branch_less_than_or_equal(out, TempRegister {0}, TempRegister {1}, true_label);
             break;
     }
-    riscv_emit::emit_load_address(out, ArgumentRegister {0}, "_bool_false");
+    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->get_bool_const(false));
     riscv_emit::emit_jump(out, end_label);
     riscv_emit::emit_label(out, true_label);
-    riscv_emit::emit_load_address(out, ArgumentRegister {0}, "_bool_true");
+    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->get_bool_const(true));
     riscv_emit::emit_label(out, end_label);
 }
 
@@ -206,10 +270,10 @@ void ExprEmitter::emit_is_void(std::ostream &out, const IsVoid *expr) {
     std::string true_label = make_unique_label();
     emit_expr(out, expr->get_subject());
     riscv_emit::emit_branch_equal_zero(out, ArgumentRegister {0}, false_label);
-    riscv_emit::emit_load_address(out, ArgumentRegister {0}, "_bool_false");
+    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->get_bool_const(false));
     riscv_emit::emit_jump(out, true_label);
     riscv_emit::emit_label(out, false_label);
-    riscv_emit::emit_load_address(out, ArgumentRegister {0}, "_bool_true");
+    riscv_emit::emit_load_address(out, ArgumentRegister {0}, cs->get_bool_const(true));
     riscv_emit::emit_label(out, true_label);
 }
 
@@ -242,7 +306,9 @@ void ExprEmitter::emit_new_obj_self_type(std::ostream &out) {
 void ExprEmitter::emit_vardecl(std::ostream &out, const Vardecl *vardecl) {
     Type vartype = vardecl->get_type();
     if (vartype == ast->self_type) {
+        emit_push(out, SavedRegister {1});
         emit_new_obj_self_type(out);
+        emit_pop(out, SavedRegister {1});
     }
     else {
         emit_new_obj(out, vartype);
@@ -338,9 +404,9 @@ void ExprEmitter::emit_static_dispatch(std::ostream &out, const StaticDispatch *
     }
 
     emit_expr(out, expr->get_target());
-    riscv_emit::emit_load_address(out, TempRegister {0}, ast->get_name(expr->get_static_dispatch_type()) + "_dispTab");
-    riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {omt->get_method_offset(curr_type, expr->get_method_name()), TempRegister {0}});
-    riscv_emit::emit_jump_and_link_register(out, TempRegister {0});
+
+    auto method = omt->find_method(expr->get_static_dispatch_type(), expr->get_method_name());
+    riscv_emit::emit_jump_and_link(out, ast->get_name(method.owner) + "." + method.name);
 
     fp_offset = fp_offset_save;
     emit_pop(out, SavedRegister {1});

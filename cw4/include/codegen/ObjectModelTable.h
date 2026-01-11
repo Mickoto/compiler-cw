@@ -31,6 +31,8 @@ public:
     int get_attr_offset(Type type, const std::string &attr) const;
     int get_method_offset(Type type, const std::string &method) const;
 
+    ObjectModel::Feature find_method(Type type, std::string method_name);
+
     std::vector<ObjectModel::Feature> get_all_attrs(Type type) const;
     std::vector<ObjectModel::Feature> get_all_methods(Type type) const;
 
