@@ -483,8 +483,8 @@ any ExprCollector::visitCase(CoolParser::CaseContext *ctx) {
         cases.push_back(CaseOfEsac::Case(varname, vartype, move(caseexpr)));
     }
 
-    // TODO: figure out what line is
-    scratchpad_.push(make_unique<CaseOfEsac>(move(multiplex), move(cases), 0, ret_type));
+    int case_line = ctx->CASE()->getSymbol()->getLine();
+    scratchpad_.push(make_unique<CaseOfEsac>(move(multiplex), move(cases), case_line, ret_type));
 
     return any{};
 }

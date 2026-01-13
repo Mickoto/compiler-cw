@@ -27,6 +27,11 @@ std::string ConstantStorage::insert_cases(std::vector<Type> val) {
     return case_table_label(case_tables.size() - 1);
 }
 
+void ConstantStorage::set_filename(std::string filename) {
+    filename_index = string_constants.size();
+    insert_string_const(filename);
+}
+
 std::vector<Constant<bool>> ConstantStorage::get_bool_constants() {
     return {{"_bool_false", false}, {"_bool_true", true}};
 }
@@ -53,6 +58,10 @@ std::vector<Constant<std::vector<Type>>> ConstantStorage::get_case_tables() {
         ret.push_back({case_table_label(i), case_tables.at(i)});
     }
     return ret;
+}
+
+std::string ConstantStorage::get_filename() {
+    return string_const_label(filename_index);
 }
 
 std::string ConstantStorage::int_const_label(int index) {

@@ -55,10 +55,11 @@ private:
     ConstantStorage *cs;
 
     std::deque<std::unordered_map<std::string, Location>> scopes;
-    Type curr_type;
+    Type curr_type, last_self_type;
     int fp_offset;
     int label;
 
+    Type safe_get_type(const Expr *expr);
     std::string make_unique_label();
     void scope_attrs(Type t);
     Location find_reference(const std::string &varname);

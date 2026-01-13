@@ -17,6 +17,7 @@ void emit_hierarchy_table(ostream &out, Classes *ast);
 void CoolCodegen::generate(ostream &out) {
     ObjectModelTable omt(ast.get());
     ConstantStorage cs;
+    cs.set_filename(file_name_);
     ExprEmitter ee(ast.get(), &omt, &cs);
 
     //text section
@@ -37,7 +38,6 @@ void CoolCodegen::generate(ostream &out) {
     riscv_emit::emit_type_tag(out, "int", ast->from_name("Int"));
     riscv_emit::emit_type_tag(out, "string", ast->from_name("String"));
     riscv_emit::emit_empty_line(out);
-
 }
 
 void emit_dispatch_tables(ostream &out, Classes *ast, ObjectModelTable &omt) {
