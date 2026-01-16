@@ -80,6 +80,7 @@ private:
     void emit_is_void(std::ostream &out, const IsVoid *expr);
     void emit_new_obj(std::ostream &out, Type t);
     void emit_new_obj_self_type(std::ostream &out);
+    void emit_default_initialize(std::ostream& out, Type t);
     void emit_vardecl(std::ostream &out, const Vardecl *vardecl);
     void emit_let_in(std::ostream &out, const LetIn *expr);
     void emit_method_invocation(std::ostream &out, const MethodInvocation *expr);

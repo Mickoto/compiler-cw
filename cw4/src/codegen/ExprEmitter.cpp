@@ -23,10 +23,10 @@ void ExprEmitter::scope_attrs(Type t) {
     scopes.push_front({});
     for (auto attr : omt->get_all_attrs(t)) {
         scopes.front().insert({attr.name,
-            MemoryLocation {omt->get_attr_offset(t, attr.name), ArgumentRegister {0}}
+            MemoryLocation {omt->get_attr_offset(t, attr.name), SavedRegister {1}}
         });
     }
-    scopes.front().insert({"self", ArgumentRegister {0}});
+    scopes.front().insert({"self", SavedRegister {1}});
 }
 
 Location ExprEmitter::find_reference(const std::string &varname) {
@@ -49,9 +49,6 @@ void ExprEmitter::emit_pop(std::ostream &out, Register reg) {
 }
 
 void ExprEmitter::emit_arithmetic(std::ostream &out, const Arithmetic *expr) {
-    emit_push(out, SavedRegister {1});
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
-
     emit_expr(out, expr->get_lhs());
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {3 * WORD_SIZE, ArgumentRegister {0}});
     emit_push(out, TempRegister {0});
@@ -81,14 +78,12 @@ void ExprEmitter::emit_arithmetic(std::ostream &out, const Arithmetic *expr) {
             break;
     }
     riscv_emit::emit_store_word(out, TempRegister {0}, MemoryLocation {3 * WORD_SIZE, ArgumentRegister {0}});
-    emit_pop(out, SavedRegister {1});
 }
 
 void ExprEmitter::emit_assignment(std::ostream &out, const Assignment *expr) {
-    emit_push(out, ArgumentRegister {0});
     emit_expr(out, expr->get_value());
     riscv_emit::emit_move(out, TempRegister {0}, ArgumentRegister {0});
-    emit_pop(out, ArgumentRegister {0});
+    riscv_emit::emit_move(out, ArgumentRegister {0}, SavedRegister {1});
     riscv_emit::emit_move_data_between_locations(out, TempRegister {0}, find_reference(expr->get_assignee_name()));
     riscv_emit::emit_move(out, ArgumentRegister {0}, TempRegister {0});
 }
@@ -117,9 +112,6 @@ void ExprEmitter::emit_case_of_esac(std::ostream &out, const CaseOfEsac *expr) {
     std::vector<Type> type_table;
     scopes.push_front({});
 
-    emit_push(out, SavedRegister {1});
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
-
     for (int i = 0; i < expr->get_cases().size(); i++) {
         const CaseOfEsac::Case &case_ = expr->get_cases()[i];
         type_table.push_back(case_.get_type());
@@ -141,7 +133,6 @@ void ExprEmitter::emit_case_of_esac(std::ostream &out, const CaseOfEsac *expr) {
     riscv_emit::emit_load_word(out, TempRegister {1}, MemoryLocation {0, ArgumentRegister {0}});
     riscv_emit::emit_load_address(out, TempRegister {2}, cs->insert_cases(type_table));
     riscv_emit::emit_jump_and_link(out, "case_get_case");
-    riscv_emit::emit_move(out, ArgumentRegister {0}, SavedRegister {1});
 
     riscv_emit::emit_branch_less_than_or_equal(out, ZeroRegister {}, TempRegister {0}, error_skip_label);
     riscv_emit::emit_push_register(out, FramePointer {});
@@ -166,14 +157,11 @@ void ExprEmitter::emit_case_of_esac(std::ostream &out, const CaseOfEsac *expr) {
     riscv_emit::emit_label(out, end_label);
     riscv_emit::emit_add_immediate(out, StackPointer {}, StackPointer {}, WORD_SIZE);
     fp_offset += WORD_SIZE;
-    emit_pop(out, SavedRegister {1});
     scopes.pop_front();
 }
 
 void ExprEmitter::emit_dynamic_dispatch(std::ostream &out, const DynamicDispatch *expr) {
-    emit_push(out, SavedRegister {1});
     int fp_offset_save = fp_offset;
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
 
     emit_push(out, FramePointer {});
     for (auto arg : expr->get_arguments()) {
@@ -189,16 +177,12 @@ void ExprEmitter::emit_dynamic_dispatch(std::ostream &out, const DynamicDispatch
     riscv_emit::emit_jump_and_link_register(out, TempRegister {0});
 
     fp_offset = fp_offset_save;
-    emit_pop(out, SavedRegister {1});
     if (expr->get_type() == ast->self_type) {
         last_self_type = dispatcher_type;
     }
 }
 
 void ExprEmitter::emit_equality_comparison(std::ostream &out, const EqualityComparison *expr) {
-    emit_push(out, SavedRegister {1});
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
-
     emit_push(out, FramePointer {});
 
     emit_expr(out, expr->get_lhs());
@@ -209,15 +193,11 @@ void ExprEmitter::emit_equality_comparison(std::ostream &out, const EqualityComp
 
     riscv_emit::emit_jump_and_link(out, "_compare_equal");
     fp_offset += 2 * WORD_SIZE;
-
-    emit_pop(out, SavedRegister {1});
 }
 
 void ExprEmitter::emit_if_then_else_fi(std::ostream &out, const IfThenElseFi *expr) {
     std::string else_label = make_unique_label();
     std::string then_label = make_unique_label();
-    emit_push(out, SavedRegister {1});
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
 
     emit_expr(out, expr->get_condition());
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {3 * WORD_SIZE, ArgumentRegister {0}});
@@ -229,8 +209,6 @@ void ExprEmitter::emit_if_then_else_fi(std::ostream &out, const IfThenElseFi *ex
     riscv_emit::emit_label(out, else_label);
     emit_expr(out, expr->get_else_expr());
     riscv_emit::emit_label(out, then_label);
-
-    emit_pop(out, SavedRegister {1});
 }
 
 void ExprEmitter::emit_int_constant_expr(std::ostream &out, const IntConstant *expr) {
@@ -241,10 +219,9 @@ void ExprEmitter::emit_integer_comparison(std::ostream &out, const IntegerCompar
     std::string true_label = make_unique_label();
     std::string end_label = make_unique_label();
 
-    emit_push(out, ArgumentRegister {0});
     emit_expr(out, expr->get_lhs());
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {3 * WORD_SIZE, ArgumentRegister {0}});
-    emit_pop(out, ArgumentRegister {0});
+    riscv_emit::emit_move(out, ArgumentRegister {0}, SavedRegister {1});
     emit_push(out, TempRegister {0});
 
     emit_expr(out, expr->get_rhs());
@@ -299,8 +276,8 @@ void ExprEmitter::emit_new_obj(std::ostream &out, Type t) {
 }
 
 void ExprEmitter::emit_new_obj_self_type(std::ostream &out) {
-    emit_push(out, SavedRegister {1});
     riscv_emit::emit_push_register(out, FramePointer {});
+    emit_push(out, SavedRegister {1});
     riscv_emit::emit_load_address(out, SavedRegister {1}, "class_objTab");
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {0, ArgumentRegister {0}});
     riscv_emit::emit_load_immediate(out, TempRegister {1}, 8);
@@ -318,14 +295,7 @@ void ExprEmitter::emit_new_obj_self_type(std::ostream &out) {
 
 void ExprEmitter::emit_vardecl(std::ostream &out, const Vardecl *vardecl) {
     Type vartype = vardecl->get_type();
-    if (vartype == ast->self_type) {
-        emit_push(out, SavedRegister {1});
-        emit_new_obj_self_type(out);
-        emit_pop(out, SavedRegister {1});
-    }
-    else {
-        emit_new_obj(out, vartype);
-    }
+    emit_default_initialize(out, vartype);
     scopes.front().insert({vardecl->get_name(), MemoryLocation {fp_offset, FramePointer {}}});
     emit_push(out, ArgumentRegister {0});
     if (vardecl->has_initializer()) {
@@ -337,8 +307,6 @@ void ExprEmitter::emit_vardecl(std::ostream &out, const Vardecl *vardecl) {
 }
 
 void ExprEmitter::emit_let_in(std::ostream &out, const LetIn *expr) {
-    emit_push(out, SavedRegister {1});
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
     scopes.push_front({});
     for (auto vardecl : expr->get_vardecls()) {
         emit_vardecl(out, vardecl);
@@ -350,13 +318,10 @@ void ExprEmitter::emit_let_in(std::ostream &out, const LetIn *expr) {
     int num_vars = expr->get_vardecls().size();
     riscv_emit::emit_add_immediate(out, StackPointer {}, StackPointer {}, WORD_SIZE * num_vars);
     fp_offset += WORD_SIZE * num_vars;
-    emit_pop(out, SavedRegister {1});
 }
 
 void ExprEmitter::emit_method_invocation(std::ostream &out, const MethodInvocation *expr) {
-    emit_push(out, SavedRegister {1});
     int fp_offset_save = fp_offset;
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
 
     emit_push(out, FramePointer {});
     for (auto arg : expr->get_arguments()) {
@@ -370,7 +335,6 @@ void ExprEmitter::emit_method_invocation(std::ostream &out, const MethodInvocati
     riscv_emit::emit_jump_and_link_register(out, TempRegister {0});
 
     fp_offset = fp_offset_save;
-    emit_pop(out, SavedRegister {1});
 
     if (expr->get_type() == ast->self_type) {
         last_self_type = curr_type;
@@ -379,9 +343,7 @@ void ExprEmitter::emit_method_invocation(std::ostream &out, const MethodInvocati
 
 void ExprEmitter::emit_new_object(std::ostream &out, const NewObject *expr) {
     if (expr->get_type() == ast->self_type) {
-        emit_push(out, SavedRegister {1});
         emit_new_obj_self_type(out);
-        emit_pop(out, SavedRegister {1});
     }
     else {
         emit_new_obj(out, expr->get_type());
@@ -400,23 +362,16 @@ void ExprEmitter::emit_parenthesized_expr(std::ostream &out, const Parenthesized
 }
 
 void ExprEmitter::emit_sequence(std::ostream &out, const Sequence *expr) {
-    emit_push(out, SavedRegister {1});
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
-
     auto sequence = expr->get_sequence();
     emit_expr(out, sequence.front());
     for (int i = 1; i < sequence.size(); i++) {
         riscv_emit::emit_move(out, ArgumentRegister {0}, SavedRegister {1});
         emit_expr(out, sequence.at(i));
     }
-
-    emit_pop(out, SavedRegister {1});
 }
 
 void ExprEmitter::emit_static_dispatch(std::ostream &out, const StaticDispatch *expr) {
-    emit_push(out, SavedRegister {1});
     int fp_offset_save = fp_offset;
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
 
     emit_push(out, FramePointer {});
     for (auto arg : expr->get_arguments()) {
@@ -431,7 +386,6 @@ void ExprEmitter::emit_static_dispatch(std::ostream &out, const StaticDispatch *
     riscv_emit::emit_jump_and_link(out, ast->get_name(method.owner) + "." + method.name);
 
     fp_offset = fp_offset_save;
-    emit_pop(out, SavedRegister {1});
 
     if (expr->get_type() == ast->self_type) {
         last_self_type = safe_get_type(expr->get_target());
@@ -445,8 +399,6 @@ void ExprEmitter::emit_string_constant_expr(std::ostream &out, const StringConst
 void ExprEmitter::emit_while_loop_pool(std::ostream &out, const WhileLoopPool *expr) {
     std::string exit_label = make_unique_label();
     std::string loop_label = make_unique_label();
-    emit_push(out, SavedRegister {1});
-    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
 
     riscv_emit::emit_label(out, loop_label);
     emit_expr(out, expr->get_condition());
@@ -459,8 +411,22 @@ void ExprEmitter::emit_while_loop_pool(std::ostream &out, const WhileLoopPool *e
     riscv_emit::emit_jump(out, loop_label);
 
     riscv_emit::emit_label(out, exit_label);
-    emit_pop(out, SavedRegister {1});
     riscv_emit::emit_move(out, ArgumentRegister {0}, ZeroRegister {});
+}
+
+void ExprEmitter::emit_default_initialize(std::ostream& out, Type t) {
+    std::unordered_set<Type> default_initializable = std::unordered_set<Type> {
+        ast->from_name("Int"),
+        ast->from_name("Bool"),
+        ast->from_name("String"),
+    };
+
+    if (default_initializable.contains(t)) {
+        emit_new_obj(out, t);
+    }
+    else {
+        riscv_emit::emit_move(out, ArgumentRegister {0}, ZeroRegister {});
+    }
 }
 
 void ExprEmitter::emit_all_methods(std::ostream& out) {
@@ -488,6 +454,8 @@ void ExprEmitter::emit_all_methods(std::ostream& out) {
             riscv_emit::emit_move(out, FramePointer {}, StackPointer {});
             fp_offset = 0;
             emit_push(out, ReturnAddress {});
+            emit_push(out, SavedRegister {1});
+            riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
 
             riscv_emit::emit_empty_line(out);
             scopes.push_front({});
@@ -501,6 +469,7 @@ void ExprEmitter::emit_all_methods(std::ostream& out) {
             scopes.pop_front();
             riscv_emit::emit_empty_line(out);
 
+            emit_pop(out, SavedRegister {1});
             riscv_emit::emit_load_word(out, ReturnAddress {}, MemoryLocation {0, FramePointer {}});
             riscv_emit::emit_add_immediate(out, StackPointer {}, StackPointer {}, (numargs + 2) * WORD_SIZE);
             riscv_emit::emit_load_word(out, FramePointer {}, MemoryLocation {0, StackPointer {}});
@@ -525,16 +494,17 @@ void ExprEmitter::emit_all_inits(std::ostream& out) {
         scope_attrs(t);
         curr_type = t;
 
-        bool noop = true;
         std::string label = ast->get_name(t) + "_init";
         riscv_emit::emit_globl(out, label);
         riscv_emit::emit_label(out, label);
 
-        fp_offset = 0;
         riscv_emit::emit_move(out, FramePointer {}, StackPointer {});
+        fp_offset = 0;
         emit_push(out, ReturnAddress {});
+        emit_push(out, SavedRegister {1});
+        riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
         if (!builtins.count(curr_type) && !builtins.count(ast->get_parent(curr_type))) {
-            emit_push(out, FramePointer {});
+            riscv_emit::emit_push_register(out, FramePointer {});
             riscv_emit::emit_jump_and_link(out, ast->get_name(ast->get_parent(curr_type)) + "_init");
         }
         riscv_emit::emit_empty_line(out);
@@ -543,11 +513,6 @@ void ExprEmitter::emit_all_inits(std::ostream& out) {
         if (!builtins.count(t)) {
             for (auto attr : attrs->get_names()) {
                 if (!attrs->has_initializer(attr)) continue;
-                if (noop) {
-                    noop = false;
-                    emit_push(out, SavedRegister {1});
-                    riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
-                }
                 emit_expr(out, attrs->get_initializer(attr));
                 riscv_emit::emit_store_word(out, ArgumentRegister {0}, MemoryLocation {omt->get_attr_offset(t, attr), SavedRegister {1}});
                 riscv_emit::emit_move(out, ArgumentRegister {0}, SavedRegister {1});
@@ -555,9 +520,7 @@ void ExprEmitter::emit_all_inits(std::ostream& out) {
             }
         }
 
-        if (!noop) {
-            emit_pop(out, SavedRegister {1});
-        }
+        emit_pop(out, SavedRegister {1});
         riscv_emit::emit_load_word(out, ReturnAddress {}, MemoryLocation {0, FramePointer {}});
         riscv_emit::emit_add_immediate(out, StackPointer {}, StackPointer {}, 8);
         riscv_emit::emit_load_word(out, FramePointer {}, MemoryLocation {0, StackPointer {}});
