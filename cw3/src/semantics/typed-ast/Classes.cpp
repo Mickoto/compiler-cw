@@ -9,15 +9,15 @@ bool Classes::contains(const std::string& classname) const {
     return name_to_idx.count(classname);
 }
 
-Type Classes::add(const std::string& classname) {
+Type Classes::add(const std::string& classname, bool builtin, bool def_initializable) {
     name_to_idx.insert({classname, classes.size()});
-    classes.push_back(classname);
+    classes.push_back({classname, builtin, def_initializable});
 
     return classes.size() - 1;
 }
 
-Type Classes::insert(const std::string& classname, Type super) {
-    Type ret = add(classname);
+Type Classes::insert(const std::string& classname, Type super, bool builtin, bool def_initializable) {
+    Type ret = add(classname, builtin, def_initializable);
     classes[ret].set_parent(super);
     return ret;
 }

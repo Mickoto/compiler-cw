@@ -63,7 +63,7 @@ private:
     std::string make_unique_label();
     void scope_attrs(Type t);
     Location find_reference(const std::string &varname);
-    // void emit_scope(std::ostream &out);
+    int temp_storage_needed_words(const Expr *expr);
     void emit_push(std::ostream &out, Register reg);
     void emit_pop(std::ostream &out, Register reg);
     void emit_arithmetic(std::ostream &out, const Arithmetic *expr);
@@ -80,7 +80,6 @@ private:
     void emit_is_void(std::ostream &out, const IsVoid *expr);
     void emit_new_obj(std::ostream &out, Type t);
     void emit_new_obj_self_type(std::ostream &out);
-    void emit_default_initialize(std::ostream& out, Type t);
     void emit_vardecl(std::ostream &out, const Vardecl *vardecl);
     void emit_let_in(std::ostream &out, const LetIn *expr);
     void emit_method_invocation(std::ostream &out, const MethodInvocation *expr);

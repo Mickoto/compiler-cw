@@ -48,6 +48,110 @@ void ExprEmitter::emit_pop(std::ostream &out, Register reg) {
     fp_offset += WORD_SIZE;
 }
 
+int ExprEmitter::temp_storage_needed_words(const Expr *expr) {
+    if (auto arithmetic = dynamic_cast<const Arithmetic *>(expr)) {
+        return std::max(temp_storage_needed_words(arithmetic->get_lhs()),
+                        1 + temp_storage_needed_words(arithmetic->get_rhs()));
+    }
+    if (auto assignment = dynamic_cast<const Assignment *>(expr)) {
+        return temp_storage_needed_words(assignment->get_value());
+    }
+    if (auto bool_constant_expr = dynamic_cast<const BoolConstant *>(expr)) {
+        return 0;
+    }
+    if (auto boolean_negation = dynamic_cast<const BooleanNegation *>(expr)) {
+        return temp_storage_needed_words(boolean_negation->get_argument());
+    }
+    if (auto case_of_esac = dynamic_cast<const CaseOfEsac *>(expr)) {
+        int max = temp_storage_needed_words(case_of_esac->get_multiplex());
+        for (int i = 0; i < case_of_esac->get_cases().size() - 1; i++) {
+            max = std::max(max, 1 + temp_storage_needed_words(case_of_esac->get_cases()[i].get_expr()));
+        }
+        return max;
+    }
+    if (auto dynamic_dispatch = dynamic_cast<const DynamicDispatch *>(expr)) {
+        int max = temp_storage_needed_words(dynamic_dispatch->get_target());
+        for (auto arg : dynamic_dispatch->get_arguments()) {
+            max = std::max(max, temp_storage_needed_words(arg));
+        }
+        return max;
+    }
+    if (auto equality_comparison = dynamic_cast<const EqualityComparison *>(expr)) {
+        return std::max(temp_storage_needed_words(equality_comparison->get_lhs()),
+                        temp_storage_needed_words(equality_comparison->get_rhs()));
+    }
+    if (auto if_then_else_fi = dynamic_cast<const IfThenElseFi *>(expr)) {
+        return std::max(temp_storage_needed_words(if_then_else_fi->get_condition()),
+               std::max(temp_storage_needed_words(if_then_else_fi->get_then_expr()),
+                        temp_storage_needed_words(if_then_else_fi->get_else_expr())));
+    }
+    if (auto int_constant_expr = dynamic_cast<const IntConstant *>(expr)) {
+        return 0;
+    }
+    if (auto integer_comparison = dynamic_cast<const IntegerComparison *>(expr)) {
+        return std::max(temp_storage_needed_words(integer_comparison->get_lhs()),
+                        1 + temp_storage_needed_words(integer_comparison->get_rhs()));
+    }
+    if (auto integer_negation = dynamic_cast<const IntegerNegation *>(expr)) {
+        return 1 + temp_storage_needed_words(integer_negation->get_argument());
+    }
+    if (auto is_void = dynamic_cast<const IsVoid *>(expr)) {
+        return temp_storage_needed_words(is_void->get_subject());
+    }
+    if (auto let_in = dynamic_cast<const LetIn *>(expr)) {
+        int depth = 0, max = 0;
+        for (auto vardecl : let_in->get_vardecls()) {
+            if (vardecl->has_initializer()) {
+                max = std::max(max, depth + 1 + temp_storage_needed_words(vardecl->get_initializer()));
+            }
+            else {
+                max = std::max(max, depth + 1);
+            }
+            depth++;
+        }
+        return std::max(max, depth + temp_storage_needed_words(let_in->get_body()));
+
+    }
+    if (auto method_invocation = dynamic_cast<const MethodInvocation *>(expr)) {
+        int max = 0;
+        for (auto arg : method_invocation->get_arguments()) {
+            max = std::max(max, temp_storage_needed_words(arg));
+        }
+        return max;
+    }
+    if (auto new_object = dynamic_cast<const NewObject *>(expr)) {
+        return 0;
+    }
+    if (auto object_reference = dynamic_cast<const ObjectReference *>(expr)) {
+        return 0;
+    }
+    if (auto parenthesized_expr = dynamic_cast<const ParenthesizedExpr *>(expr)) {
+        return temp_storage_needed_words(parenthesized_expr->get_contents());
+    }
+    if (auto sequence = dynamic_cast<const Sequence *>(expr)) {
+        int max = 0;
+        for (auto exp : sequence->get_sequence()) {
+            max = std::max(max, temp_storage_needed_words(exp));
+        }
+        return max;
+    }
+    if (auto static_dispatch = dynamic_cast<const StaticDispatch *>(expr)) {
+        int max = temp_storage_needed_words(static_dispatch->get_target());
+        for (auto arg : static_dispatch->get_arguments()) {
+            max = std::max(max, temp_storage_needed_words(arg));
+        }
+        return max;
+    }
+    if (auto string_constant_expr = dynamic_cast<const StringConstant *>(expr)) {
+        return 0;
+    }
+    if (auto while_loop_pool = dynamic_cast<const WhileLoopPool *>(expr)) {
+        return std::max(temp_storage_needed_words(while_loop_pool->get_condition()),
+                        temp_storage_needed_words(while_loop_pool->get_body()));
+    }
+    return 0;
+}
+
 void ExprEmitter::emit_arithmetic(std::ostream &out, const Arithmetic *expr) {
     emit_expr(out, expr->get_lhs());
     riscv_emit::emit_load_word(out, TempRegister {0}, MemoryLocation {3 * WORD_SIZE, ArgumentRegister {0}});
@@ -271,8 +375,10 @@ void ExprEmitter::emit_new_obj(std::ostream &out, Type t) {
     riscv_emit::emit_load_address(out, ArgumentRegister {0}, ast->get_name(t) + "_protObj");
     riscv_emit::emit_push_register(out, FramePointer {});
     riscv_emit::emit_jump_and_link(out, "Object.copy");
-    riscv_emit::emit_push_register(out, FramePointer {});
-    riscv_emit::emit_jump_and_link(out, ast->get_name(t) + "_init");
+    if (!omt->is_nop_initializable(t)) {
+        riscv_emit::emit_push_register(out, FramePointer {});
+        riscv_emit::emit_jump_and_link(out, ast->get_name(t) + "_init");
+    }
 }
 
 void ExprEmitter::emit_new_obj_self_type(std::ostream &out) {
@@ -295,7 +401,12 @@ void ExprEmitter::emit_new_obj_self_type(std::ostream &out) {
 
 void ExprEmitter::emit_vardecl(std::ostream &out, const Vardecl *vardecl) {
     Type vartype = vardecl->get_type();
-    emit_default_initialize(out, vartype);
+    if (ast->is_default_initializable(vartype)) {
+        emit_new_obj(out, vartype);
+    }
+    else {
+        riscv_emit::emit_move(out, ArgumentRegister {0}, ZeroRegister {});
+    }
     scopes.front().insert({vardecl->get_name(), MemoryLocation {fp_offset, FramePointer {}}});
     emit_push(out, ArgumentRegister {0});
     if (vardecl->has_initializer()) {
@@ -414,32 +525,9 @@ void ExprEmitter::emit_while_loop_pool(std::ostream &out, const WhileLoopPool *e
     riscv_emit::emit_move(out, ArgumentRegister {0}, ZeroRegister {});
 }
 
-void ExprEmitter::emit_default_initialize(std::ostream& out, Type t) {
-    std::unordered_set<Type> default_initializable = std::unordered_set<Type> {
-        ast->from_name("Int"),
-        ast->from_name("Bool"),
-        ast->from_name("String"),
-    };
-
-    if (default_initializable.contains(t)) {
-        emit_new_obj(out, t);
-    }
-    else {
-        riscv_emit::emit_move(out, ArgumentRegister {0}, ZeroRegister {});
-    }
-}
-
 void ExprEmitter::emit_all_methods(std::ostream& out) {
-    std::unordered_set<Type> builtins = std::unordered_set<Type> {
-        ast->from_name("Object"),
-        ast->from_name("Int"),
-        ast->from_name("Bool"),
-        ast->from_name("String"),
-        ast->from_name("IO")
-    };
-
     for (Type t : ast->get_types()) {
-        if (builtins.count(t)) continue;
+        if (ast->is_builtin(t)) continue;
 
         curr_type = t;
         scope_attrs(t);
@@ -481,21 +569,23 @@ void ExprEmitter::emit_all_methods(std::ostream& out) {
     }
 }
 
-void ExprEmitter::emit_all_inits(std::ostream& out) {
-    std::unordered_set<Type> builtins = std::unordered_set<Type> {
-        ast->from_name("Object"),
-        ast->from_name("Int"),
-        ast->from_name("Bool"),
-        ast->from_name("String"),
-        ast->from_name("IO")
-    };
+void emit_nop_init(std::ostream& out) {
+    riscv_emit::emit_label(out, "nop_init");
+    riscv_emit::emit_add_immediate(out, StackPointer {}, StackPointer {}, 4);
+    riscv_emit::emit_load_word(out, FramePointer {}, MemoryLocation {0, StackPointer {}});
+    riscv_emit::emit_return(out);
+}
 
+void ExprEmitter::emit_all_inits(std::ostream& out) {
     for (Type t : ast->get_types()) {
+        if (omt->is_nop_initializable(t)) continue;
         scope_attrs(t);
         curr_type = t;
 
         std::string label = ast->get_name(t) + "_init";
-        riscv_emit::emit_globl(out, label);
+        if (ast->is_builtin(t) || ast->get_name(t) == "Main") {
+            riscv_emit::emit_globl(out, label);
+        }
         riscv_emit::emit_label(out, label);
 
         riscv_emit::emit_move(out, FramePointer {}, StackPointer {});
@@ -503,14 +593,14 @@ void ExprEmitter::emit_all_inits(std::ostream& out) {
         emit_push(out, ReturnAddress {});
         emit_push(out, SavedRegister {1});
         riscv_emit::emit_move(out, SavedRegister {1}, ArgumentRegister {0});
-        if (!builtins.count(curr_type) && !builtins.count(ast->get_parent(curr_type))) {
+        if (!omt->is_nop_initializable(ast->get_parent(curr_type))) {
             riscv_emit::emit_push_register(out, FramePointer {});
             riscv_emit::emit_jump_and_link(out, ast->get_name(ast->get_parent(curr_type)) + "_init");
         }
         riscv_emit::emit_empty_line(out);
 
         Attributes *attrs = ast->get_class(t)->get_attributes();
-        if (!builtins.count(t)) {
+        if (!ast->is_builtin(t)) {
             for (auto attr : attrs->get_names()) {
                 if (!attrs->has_initializer(attr)) continue;
                 emit_expr(out, attrs->get_initializer(attr));
@@ -529,12 +619,19 @@ void ExprEmitter::emit_all_inits(std::ostream& out) {
 
         scopes.pop_front();
     }
+
+    for (Type t : omt->get_nop_initializable()) {
+        if (ast->is_builtin(t) || ast->get_name(t) == "Main") {
+            std::string label = ast->get_name(t) + "_init";
+            riscv_emit::emit_globl(out, label);
+            riscv_emit::emit_label(out, label);
+        }
+    }
+    emit_nop_init(out);
+    riscv_emit::emit_empty_line(out);
 }
 
 void ExprEmitter::emit_expr(std::ostream& out, const Expr *expr) {
-    if (auto assignment = dynamic_cast<const Assignment *>(expr)) {
-        return emit_assignment(out, assignment);
-    }
     if (auto arithmetic = dynamic_cast<const Arithmetic *>(expr)) {
         return emit_arithmetic(out, arithmetic);
     }

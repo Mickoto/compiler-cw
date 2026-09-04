@@ -3,11 +3,11 @@
 using std::vector;
 
 void ClassCollector::instantiate_base_classes() {
-    obj = ast->insert("Object", ast->no_type);
-    ast->insert("Int", obj);
-    ast->insert("Bool", obj);
-    ast->insert("String", obj);
-    ast->insert("IO", obj);
+    obj = ast->insert("Object", ast->no_type, true, false);
+    ast->insert("Int", obj, true, true);
+    ast->insert("Bool", obj, true, true);
+    ast->insert("String", obj, true, true);
+    ast->insert("IO", obj, true, false);
 }
 
 void ClassCollector::link_inheritance() {

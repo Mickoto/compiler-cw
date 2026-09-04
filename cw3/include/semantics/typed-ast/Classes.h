@@ -25,12 +25,14 @@ public:
     static const Type error_type = -3;
 
     bool contains(const std::string& classname) const;
-    Type add(const std::string& classname);
-    Type insert(const std::string& classname, Type super);
+    Type add(const std::string& classname, bool builtin = false, bool def_initializable = false);
+    Type insert(const std::string& classname, Type super, bool builtin = false, bool def_initializable = false);
 
     std::vector<Type> get_types() const;
     Type from_name(const std::string& classname) const;
     Class *get_class(Type t);
+    bool is_builtin(Type t) const { return classes[t].is_builtin(); }
+    bool is_default_initializable(Type t) const { return classes[t].is_default_initializable(); }
     std::string get_name(Type t) const;
     Type get_parent(Type t) const;
     bool is_super(Type context, Type t, Type sup) const;

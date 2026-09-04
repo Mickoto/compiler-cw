@@ -29,6 +29,18 @@ ObjectModelTable::ObjectModelTable(Classes *ast) {
         int attroff = ATTR_START;
         int methodoff = METHOD_START;
         models.push_back(collect_features(ast, t, t, attroff, methodoff));
+
+        bool nop_init = true;
+        auto attrs = ast->get_class(t)->get_attributes();
+        for (auto attr : attrs->get_names()) {
+            if (attrs->has_initializer(attr))
+                nop_init = false;
+        }
+
+        if (nop_init) {
+            nop_initializables.push_back(t);
+            nop_initializable.insert(t);
+        }
     }
 }
 
@@ -65,4 +77,12 @@ bool ObjectModelTable::has_method(Type t, std::string method) const {
 
 bool ObjectModelTable::has_attr(Type t, std::string attr) const {
     return models[t].attr_name_to_off.count(attr);
+}
+
+bool ObjectModelTable::is_nop_initializable(Type t) const {
+    return nop_initializable.contains(t);
+}
+
+std::vector<Type> ObjectModelTable::get_nop_initializable() const {
+    return nop_initializables;
 }

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "semantics/typed-ast/Classes.h"
@@ -39,8 +40,13 @@ public:
     bool has_method(Type t, std::string method) const;
     bool has_attr(Type t, std::string attr) const;
 
+    bool is_nop_initializable(Type t) const;
+    std::vector<Type> get_nop_initializable() const;
+
 private:
     std::vector<ObjectModel> models;
+    std::unordered_set<Type> nop_initializable;
+    std::vector<Type> nop_initializables;
 };
 
 #endif // CODEGEN_OBJECTMODELTABLE_H

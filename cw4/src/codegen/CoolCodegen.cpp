@@ -41,19 +41,10 @@ void CoolCodegen::generate(ostream &out) {
 }
 
 void emit_dispatch_tables(ostream &out, Classes *ast, ObjectModelTable &omt) {
-    std::unordered_set<Type> builtins = std::unordered_set<Type> {
-        ast->from_name("Object"),
-        ast->from_name("Int"),
-        ast->from_name("Bool"),
-        ast->from_name("String"),
-        ast->from_name("IO")
-    };
-
-
     riscv_emit::emit_header_comment(out, "Dispatch tables");
     for (Type t : ast->get_types()) {
         std::string label = ast->get_name(t) + "_dispTab";
-        if (builtins.count(t)) {
+        if (ast->is_builtin(t)) {
             riscv_emit::emit_globl(out, label);
         }
         riscv_emit::emit_label(out, label);
